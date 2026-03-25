@@ -2,6 +2,8 @@
 
 ## Support Vector Machines with Gaussian Mixture Sample Uncertainty
 
+[![Open Demo In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/SushrutGaikwad/svm-gmu/blob/main/examples/demo_2d.ipynb)
+
 SVM-GMU extends the SVM-GSU framework to handle per-sample non-Gaussian
 uncertainty modelled as Gaussian mixtures. By exploiting the linearity of
 expectation, the expected hinge loss under a Gaussian mixture decomposes

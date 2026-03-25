@@ -37,7 +37,7 @@ import numpy as np
 from svm_gmu import SVMGMU, validate_gmm_dataset
 
 # Two data points in 2D, one per class
-X_means = np.array([
+X = np.array([
     [ 2.0,  1.0],   # Point 0: class +1
     [-2.0, -1.0],   # Point 1: class -1
 ])
@@ -104,10 +104,10 @@ gmm_params = [
     },
 ]
 
-validate_gmm_dataset(X_means, y, gmm_params)
+validate_gmm_dataset(X, y, gmm_params)
 
 clf = SVMGMU(lam=0.01, n_epochs=500, lr_init=0.5)
-clf.fit(X_means, y, gmm_params)
+clf.fit(X, y, gmm_params)
 print(f"w = {clf.w_}, b = {clf.b_:.4f}")
 
 probs = clf.expected_misclassification()

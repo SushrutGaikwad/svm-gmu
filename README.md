@@ -10,11 +10,19 @@ objective with analytic gradients.
 
 ## Installation
 
+Install SVM-GMU directly from GitHub:
+
 ```bash
-uv add svm-gmu
+pip install git+https://github.com/SushrutGaikwad/svm-gmu.git
 ```
 
-Or install from source:
+Or with uv:
+
+```bash
+uv add git+https://github.com/SushrutGaikwad/svm-gmu.git
+```
+
+Or clone and install locally:
 
 ```bash
 git clone https://github.com/SushrutGaikwad/svm-gmu.git

@@ -1,4 +1,4 @@
-"""Closed-form loss and gradient computations for SVM-GMMU.
+"""Closed-form loss and gradient computations for SVM-GMU.
 
 Every public function in this module corresponds to one or more equations
 from the paper.  The mapping is:
@@ -8,8 +8,8 @@ from the paper.  The mapping is:
     component_loss      -> Eq. 23 / 46   (expected hinge loss, one Gaussian)
     component_grad_w    -> per-component part of Eq. 35 / 49
     component_grad_b    -> per-component part of Eq. 37 / 50
-    gmmu_objective      -> Eq. 48        (full objective)
-    gmmu_gradients      -> Eqs. 49-50    (full gradients for a mini-batch)
+    gmu_objective      -> Eq. 48        (full objective)
+    gmu_gradients      -> Eqs. 49-50    (full gradients for a mini-batch)
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ def compute_d_mu(
 ) -> float:
     """Signed margin distance of a component mean.
 
-    Equation 21 (GSU) / 44 (GMMU):
+    Equation 21 (GSU) / 44 (GMU):
         d_mu = 1 - y * (w^T mu + b)
 
     This is exactly the standard hinge-loss argument evaluated at the
@@ -72,7 +72,7 @@ def compute_d_sigma(
 ) -> float:
     """Uncertainty spread in the classification-relevant direction.
 
-    Equation 22 (GSU) / 45 (GMMU):
+    Equation 22 (GSU) / 45 (GMU):
         d_sigma = sqrt(2 * w^T Sigma w)
 
     The quantity w^T Sigma w is the variance of the projection w^T x
@@ -108,7 +108,7 @@ def compute_d_sigma(
 def component_loss(d_mu: float, d_sigma: float) -> float:
     """Closed-form expected hinge loss for a single Gaussian component.
 
-    Equation 23 (GSU) / 46 (GMMU):
+    Equation 23 (GSU) / 46 (GMU):
         L = (d_mu / 2) * [erf(d_mu / d_sigma) + 1]
             + (d_sigma / (2 sqrt(pi))) * exp(-(d_mu / d_sigma)^2)
 
@@ -151,7 +151,7 @@ def component_grad_w(
     """Gradient of one component's loss with respect to w.
 
     This is the per-component piece inside the sum of Equation 35 (GSU) /
-    49 (GMMU), without the mixing weight or the 1/n factor:
+    49 (GMU), without the mixing weight or the 1/n factor:
 
         dL_i^(m)/dw = [exp(-r^2) / (sqrt(pi) * d_sigma)] * Sigma w
                       - (y / 2) * [erf(r) + 1] * mu
@@ -216,7 +216,7 @@ def component_grad_b(y: float, d_mu: float, d_sigma: float) -> float:
     """Gradient of one component's loss with respect to b.
 
     This is the per-component piece inside the sum of Equation 37 (GSU) /
-    50 (GMMU), without the mixing weight or the 1/n factor:
+    50 (GMU), without the mixing weight or the 1/n factor:
 
         dL_i^(m)/db = -y * [erf(d_mu / d_sigma) + 1]
 
@@ -254,14 +254,14 @@ def component_grad_b(y: float, d_mu: float, d_sigma: float) -> float:
 # ===================================================================
 
 
-def gmmu_objective(
+def gmu_objective(
     w: NDArray[np.floating],
     b: float,
     sample_uncertainty: list[dict],
     y: NDArray[np.floating],
     lam: float,
 ) -> float:
-    """Full SVM-GMMU objective function.
+    """Full SVM-GMU objective function.
 
     Equation 48:
         J(w, b) = (lam / 2) ||w||^2
@@ -306,7 +306,7 @@ def gmmu_objective(
     return reg + total_loss / n
 
 
-def gmmu_gradients(
+def gmu_gradients(
     w: NDArray[np.floating],
     b: float,
     sample_uncertainty: list[dict],
@@ -314,7 +314,7 @@ def gmmu_gradients(
     lam: float,
     batch_indices: NDArray[np.intp] | None = None,
 ) -> tuple[NDArray[np.floating], float]:
-    """Gradients of the SVM-GMMU objective for a mini-batch.
+    """Gradients of the SVM-GMU objective for a mini-batch.
 
     Equations 49-50:
         dJ/dw = lam * w

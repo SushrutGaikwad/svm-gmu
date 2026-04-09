@@ -1,4 +1,4 @@
-"""Visualization utilities for SVM-GMMU.
+"""Visualization utilities for SVM-GMU.
 
 This module provides three plotting functions for 2-D datasets:
 
@@ -6,9 +6,9 @@ This module provides three plotting functions for 2-D datasets:
         Show per-sample GMM density contours at configurable sigma levels.
     plot_boundary
         Show the decision boundary and margins learned by a fitted
-        :class:`~svm_gmmu.SvmGmmu` model, overlaid on the GMM contours.
+        :class:`~svm_gmu.SvmGmu` model, overlaid on the GMM contours.
     plot_boundary_comparison
-        Side-by-side comparison of two fitted models (typically SVM-GMMU
+        Side-by-side comparison of two fitted models (typically SVM-GMU
         vs. a standard SVM) on the same dataset.
 
 All three functions require ``matplotlib`` (an optional dependency).  Install
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
     from numpy.typing import NDArray
 
-    from svm_gmmu._estimator import SvmGmmu
+    from svm_gmu._estimator import SvmGmu
 
 
 # ===================================================================
@@ -245,7 +245,7 @@ def _draw_points(
 
 def _draw_boundary(
     ax: Axes,
-    model: SvmGmmu,
+    model: SvmGmu,
     xlim: tuple[float, float],
     ylim: tuple[float, float],
     grid_resolution: int,
@@ -351,7 +351,7 @@ def plot_uncertainty(
     y : ndarray of shape (n,)
         Class labels in {+1, -1}.
     sample_uncertainty : list of dict
-        Per-sample GMM uncertainty (see :meth:`SvmGmmu.fit`).
+        Per-sample GMM uncertainty (see :meth:`SvmGmu.fit`).
     sigmas : tuple of int, default=(1, 2, 3)
         Which sigma-level contours to draw.
     grid_resolution : int, default=300
@@ -384,8 +384,8 @@ def plot_uncertainty(
 
     Examples
     --------
-    >>> from svm_gmmu import SvmGmmu
-    >>> from svm_gmmu.plotting import plot_uncertainty
+    >>> from svm_gmu import SvmGmu
+    >>> from svm_gmu.plotting import plot_uncertainty
     >>> fig, ax = plot_uncertainty(X, y, sample_uncertainty)
     """
     plt = _require_matplotlib()
@@ -421,13 +421,13 @@ def plot_boundary(
     X: NDArray,
     y: NDArray,
     sample_uncertainty: list[dict],
-    model: SvmGmmu,
+    model: SvmGmu,
     *,
     sigmas: tuple[int, ...] = _DEFAULT_SIGMAS,
     grid_resolution: int = _DEFAULT_GRID_RES,
     point_size: float = 90,
     figsize: tuple[float, float] = (10, 10),
-    title: str = "SVM-GMMU Decision Boundary",
+    title: str = "SVM-GMU Decision Boundary",
     random_state: int | None = 0,
     ax: Axes | None = None,
 ) -> tuple[Figure, Axes]:
@@ -445,8 +445,8 @@ def plot_boundary(
         Class labels in {+1, -1}.
     sample_uncertainty : list of dict
         Per-sample GMM uncertainty.
-    model : SvmGmmu
-        A fitted :class:`~svm_gmmu.SvmGmmu` instance.
+    model : SvmGmu
+        A fitted :class:`~svm_gmu.SvmGmu` instance.
     sigmas : tuple of int, default=(1, 2, 3)
         Which sigma-level contours to draw.
     grid_resolution : int, default=300
@@ -455,7 +455,7 @@ def plot_boundary(
         Marker size for the observed points.
     figsize : tuple of float, default=(10, 10)
         Figure size in inches (ignored when *ax* is provided).
-    title : str, default="SVM-GMMU Decision Boundary"
+    title : str, default="SVM-GMU Decision Boundary"
         Axes title.
     random_state : int or None, default=0
         Seed for the Monte Carlo sigma-level estimation.
@@ -478,11 +478,11 @@ def plot_boundary(
 
     Examples
     --------
-    >>> from svm_gmmu import SvmGmmu
-    >>> from svm_gmmu.plotting import plot_boundary
-    >>> model = SvmGmmu(lam=0.01, max_iter=5000, batch_size=1, random_state=42)
+    >>> from svm_gmu import SvmGmu
+    >>> from svm_gmu.plotting import plot_boundary
+    >>> model = SvmGmu(lam=0.01, max_iter=5000, batch_size=1, random_state=42)
     >>> model.fit(X, y, sample_uncertainty=sample_uncertainty)
-    SvmGmmu(batch_size=1, lam=0.01, max_iter=5000, random_state=42)
+    SvmGmu(batch_size=1, lam=0.01, max_iter=5000, random_state=42)
     >>> fig, ax = plot_boundary(X, y, sample_uncertainty, model)
     """
     plt = _require_matplotlib()
@@ -523,23 +523,23 @@ def plot_boundary_comparison(
     X: NDArray,
     y: NDArray,
     sample_uncertainty: list[dict],
-    model_gmmu: SvmGmmu,
-    model_svm: SvmGmmu,
+    model_gmu: SvmGmu,
+    model_svm: SvmGmu,
     *,
     sigmas: tuple[int, ...] = _DEFAULT_SIGMAS,
     grid_resolution: int = _DEFAULT_GRID_RES,
     point_size: float = 90,
     figsize: tuple[float, float] = (16, 8),
     titles: tuple[str, str] = (
-        "SVM-GMMU (with uncertainty)",
+        "SVM-GMU (with uncertainty)",
         "Standard SVM (no uncertainty)",
     ),
-    suptitle: str = "Decision Boundary Comparison: SVM-GMMU vs Standard SVM",
+    suptitle: str = "Decision Boundary Comparison: SVM-GMU vs Standard SVM",
     random_state: int | None = 0,
 ) -> tuple[Figure, tuple[Axes, Axes]]:
     """Side-by-side comparison of two fitted models on the same dataset.
 
-    The left panel shows the *model_gmmu* boundary and the right panel
+    The left panel shows the *model_gmu* boundary and the right panel
     shows the *model_svm* boundary, both overlaid on the same GMM
     density contours and observed points.  This is useful for seeing
     how uncertainty-aware training shifts the decision boundary compared
@@ -553,9 +553,9 @@ def plot_boundary_comparison(
         Class labels in {+1, -1}.
     sample_uncertainty : list of dict
         Per-sample GMM uncertainty.
-    model_gmmu : SvmGmmu
+    model_gmu : SvmGmu
         A fitted uncertainty-aware model.
-    model_svm : SvmGmmu
+    model_svm : SvmGmu
         A fitted standard SVM model (trained without uncertainty).
     sigmas : tuple of int, default=(1, 2, 3)
         Which sigma-level contours to draw.
@@ -565,7 +565,7 @@ def plot_boundary_comparison(
         Marker size for the observed points.
     figsize : tuple of float, default=(16, 8)
         Figure size in inches.
-    titles : tuple of str, default=("SVM-GMMU (with uncertainty)", ...)
+    titles : tuple of str, default=("SVM-GMU (with uncertainty)", ...)
         Titles for the left and right panels.
     suptitle : str
         Figure-level title.
@@ -588,22 +588,22 @@ def plot_boundary_comparison(
 
     Examples
     --------
-    >>> from svm_gmmu import SvmGmmu
-    >>> from svm_gmmu.plotting import plot_boundary_comparison
-    >>> model_gmmu = SvmGmmu(lam=0.01, max_iter=5000, random_state=42)
-    >>> model_gmmu.fit(X, y, sample_uncertainty=sample_uncertainty)
-    SvmGmmu(lam=0.01, max_iter=5000, random_state=42)
-    >>> model_svm = SvmGmmu(lam=0.01, max_iter=5000, random_state=42)
+    >>> from svm_gmu import SvmGmu
+    >>> from svm_gmu.plotting import plot_boundary_comparison
+    >>> model_gmu = SvmGmu(lam=0.01, max_iter=5000, random_state=42)
+    >>> model_gmu.fit(X, y, sample_uncertainty=sample_uncertainty)
+    SvmGmu(lam=0.01, max_iter=5000, random_state=42)
+    >>> model_svm = SvmGmu(lam=0.01, max_iter=5000, random_state=42)
     >>> model_svm.fit(X, y)
-    SvmGmmu(lam=0.01, max_iter=5000, random_state=42)
+    SvmGmu(lam=0.01, max_iter=5000, random_state=42)
     >>> fig, (ax_l, ax_r) = plot_boundary_comparison(
-    ...     X, y, sample_uncertainty, model_gmmu, model_svm,
+    ...     X, y, sample_uncertainty, model_gmu, model_svm,
     ... )
     """
     plt = _require_matplotlib()
     from sklearn.utils.validation import check_is_fitted
 
-    check_is_fitted(model_gmmu, ["coef_", "intercept_"])
+    check_is_fitted(model_gmu, ["coef_", "intercept_"])
     check_is_fitted(model_svm, ["coef_", "intercept_"])
     X = np.asarray(X, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64).ravel()
@@ -622,7 +622,7 @@ def plot_boundary_comparison(
     xlim, ylim = _auto_limits(sample_uncertainty)
 
     for ax, model, panel_title, is_left in [
-        (ax_left, model_gmmu, titles[0], True),
+        (ax_left, model_gmu, titles[0], True),
         (ax_right, model_svm, titles[1], False),
     ]:
         # Use a fresh RNG seeded identically so both panels get the

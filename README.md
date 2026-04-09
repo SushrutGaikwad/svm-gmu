@@ -1,8 +1,8 @@
-# SVM-GMMU
+# SVM-GMU
 
-SVM with Gaussian Mixture Model Uncertainty.
+SVM with Gaussian Mixture Uncertainty.
 
-A scikit-learn-compatible classifier that accounts for per-sample uncertainty modeled as Gaussian mixtures. Includes the single-Gaussian special case (SVM-GSU) from Tzelepis, Mezaris, and Patras (IEEE TPAMI, 2017) and extends it to mixtures of Gaussians (SVM-GMMU).
+A scikit-learn-compatible classifier that accounts for per-sample uncertainty modeled as Gaussian mixtures. Includes the single-Gaussian special case (SVM-GSU) from Tzelepis, Mezaris, and Patras (IEEE TPAMI, 2017) and extends it to mixtures of Gaussians (SVM-GMU).
 
 ## Installation
 
@@ -43,7 +43,7 @@ $\mathbf{X}$ has shape $(n, d)$. Each row $\mathbf{x}_i$ is the observed feature
 
 ```python
 import numpy as np
-from svm_gmmu import SvmGmmu
+from svm_gmu import SvmGmu
 
 X = np.array([
     [1.0, 2.0],   # sample 1
@@ -133,11 +133,11 @@ Create the model and call `fit`. The hyperparameters are:
 - **`random_state`**: seed for reproducibility.
 
 ```python
-model = SvmGmmu(lam=0.01, max_iter=1000, batch_size=1, random_state=42)
+model = SvmGmu(lam=0.01, max_iter=1000, batch_size=1, random_state=42)
 model.fit(X, y, sample_uncertainty=sample_uncertainty)
 ```
 
-`fit` learns the weight vector $\mathbf{w}$ and bias $b$ by minimizing the SVM-GMMU objective (Eq. 48 in the report):
+`fit` learns the weight vector $\mathbf{w}$ and bias $b$ by minimizing the SVM-GMU objective (Eq. 48 in the report):
 
 $$\mathcal{J}(\mathbf{w}, b) = \frac{\lambda}{2}\|\mathbf{w}\|^2 + \frac{1}{n}\sum_{i=1}^{n}\sum_{m=1}^{M_i} \pi_i^{(m)}\,\mathcal{L}_i^{(m)}(\mathbf{w}, b)$$
 
@@ -164,17 +164,17 @@ print("Scores:", scores)
 When no uncertainty information is available, omit `sample_uncertainty` (or pass `None`). The model internally treats each row of $\mathbf{X}$ as a point mass ($\boldsymbol{\Sigma}_i \to \mathbf{0}$, single-component GMM) and reduces to a standard linear SVM:
 
 ```python
-model = SvmGmmu(lam=0.01, max_iter=1000)
+model = SvmGmu(lam=0.01, max_iter=1000)
 model.fit(X, y)  # no uncertainty -> standard SVM
 predictions = model.predict(X)
 ```
 
 ## Visualization
 
-The `svm_gmmu.plotting` module provides three functions for visualizing 2-D datasets. Matplotlib is required (installed automatically with `uv sync`).
+The `svm_gmu.plotting` module provides three functions for visualizing 2-D datasets. Matplotlib is required (installed automatically with `uv sync`).
 
 ```python
-from svm_gmmu.plotting import plot_uncertainty, plot_boundary, plot_boundary_comparison
+from svm_gmu.plotting import plot_uncertainty, plot_boundary, plot_boundary_comparison
 ```
 
 ### Plot uncertainty contours (data only)
@@ -202,26 +202,26 @@ fig, ax = plot_uncertainty(
 After fitting a model, overlay its decision boundary ($\mathbf{w}^\intercal \mathbf{x} + b = 0$, solid line) and margin lines ($\pm 1$, dashed) on top of the uncertainty contours.
 
 ```python
-model = SvmGmmu(lam=0.01, max_iter=5000, batch_size=1, random_state=42)
+model = SvmGmu(lam=0.01, max_iter=5000, batch_size=1, random_state=42)
 model.fit(X, y, sample_uncertainty=sample_uncertainty)
 
 fig, ax = plot_boundary(X, y, sample_uncertainty, model)
 ```
 
-### Compare SVM-GMMU vs. standard SVM
+### Compare SVM-GMU vs. standard SVM
 
 Train both an uncertainty-aware model and a standard SVM, then plot them side by side to see how uncertainty shifts the decision boundary.
 
 ```python
-model_gmmu = SvmGmmu(lam=0.01, max_iter=5000, batch_size=1, random_state=42)
-model_gmmu.fit(X, y, sample_uncertainty=sample_uncertainty)
+model_gmu = SvmGmu(lam=0.01, max_iter=5000, batch_size=1, random_state=42)
+model_gmu.fit(X, y, sample_uncertainty=sample_uncertainty)
 
-model_svm = SvmGmmu(lam=0.01, max_iter=5000, batch_size=1, random_state=42)
+model_svm = SvmGmu(lam=0.01, max_iter=5000, batch_size=1, random_state=42)
 model_svm.fit(X, y)  # no uncertainty -> standard SVM
 
 fig, (ax_left, ax_right) = plot_boundary_comparison(
     X, y, sample_uncertainty,
-    model_gmmu, model_svm,
+    model_gmu, model_svm,
 )
 ```
 

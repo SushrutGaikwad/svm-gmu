@@ -1,7 +1,7 @@
-"""Input validation utilities for SVM-GMMU.
+"""Input validation utilities for SVM-GMU.
 
 This module provides validation for the ``sample_uncertainty`` parameter
-passed to :meth:`SvmGmmu.fit`.  Each function raises ``ValueError`` with
+passed to :meth:`SvmGmu.fit`.  Each function raises ``ValueError`` with
 a descriptive message when an invariant is violated, so the user gets a
 clear explanation rather than a cryptic NumPy error from deep inside the
 math routines.
@@ -214,7 +214,7 @@ def build_default_uncertainty(
 ) -> list[dict]:
     """Create trivial uncertainty entries (zero-variance point masses).
 
-    Used when ``sample_uncertainty=None`` is passed to :meth:`SvmGmmu.fit`,
+    Used when ``sample_uncertainty=None`` is passed to :meth:`SvmGmu.fit`,
     so the math code can uniformly assume uncertainty data is present.
     Each sample gets a single component with weight 1, mean equal to the
     row of X, and a zero diagonal covariance.  This makes the loss reduce

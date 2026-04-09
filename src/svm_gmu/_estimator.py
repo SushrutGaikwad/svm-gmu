@@ -1,6 +1,6 @@
-"""Scikit-learn compatible SVM-GMMU estimator.
+"""Scikit-learn compatible SVM-GMU estimator.
 
-This module provides :class:`SvmGmmu`, a linear classifier that accounts
+This module provides :class:`SvmGmu`, a linear classifier that accounts
 for per-sample uncertainty modeled as Gaussian mixtures.  It follows the
 scikit-learn estimator API (``fit`` / ``predict`` / ``decision_function``)
 and uses the Pegasos-style SGD algorithm described in Sections 12 and 21
@@ -21,15 +21,15 @@ from numpy.typing import NDArray
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_is_fitted
 
-from svm_gmmu._loss import gmmu_gradients, gmmu_objective
-from svm_gmmu._validation import (
+from svm_gmu._loss import gmu_gradients, gmu_objective
+from svm_gmu._validation import (
     build_default_uncertainty,
     validate_labels,
     validate_sample_uncertainty,
 )
 
 
-class SvmGmmu(BaseEstimator, ClassifierMixin):
+class SvmGmu(BaseEstimator, ClassifierMixin):
     """SVM with Gaussian Mixture Model Uncertainty.
 
     A linear classifier that minimizes the expected hinge loss under
@@ -82,12 +82,12 @@ class SvmGmmu(BaseEstimator, ClassifierMixin):
     Examples
     --------
     >>> import numpy as np
-    >>> from svm_gmmu import SvmGmmu
+    >>> from svm_gmu import SvmGmu
     >>> X = np.array([[0.0, 0.0], [1.0, 1.0]])
     >>> y = np.array([1, -1])
-    >>> model = SvmGmmu(lam=0.01, max_iter=500)
+    >>> model = SvmGmu(lam=0.01, max_iter=500)
     >>> model.fit(X, y)  # no uncertainty -> standard SVM
-    SvmGmmu(lam=0.01, max_iter=500)
+    SvmGmu(lam=0.01, max_iter=500)
     >>> model.predict(X)
     array([ 1., -1.])
     """
@@ -119,8 +119,8 @@ class SvmGmmu(BaseEstimator, ClassifierMixin):
         X: NDArray[np.floating],
         y: NDArray,
         sample_uncertainty: list[dict] | None = None,
-    ) -> "SvmGmmu":
-        """Fit the SVM-GMMU model using Pegasos-style SGD.
+    ) -> "SvmGmu":
+        """Fit the SVM-GMU model using Pegasos-style SGD.
 
         Parameters
         ----------
@@ -285,7 +285,7 @@ class SvmGmmu(BaseEstimator, ClassifierMixin):
             eta = 1.0 / (self.lam * t)
 
             # (c) Compute gradients (Eqs. 49-50)
-            grad_w, grad_b = gmmu_gradients(
+            grad_w, grad_b = gmu_gradients(
                 w, b, sample_uncertainty, y, self.lam, batch_idx
             )
 
@@ -300,7 +300,7 @@ class SvmGmmu(BaseEstimator, ClassifierMixin):
 
             # -- Logging ------------------------------------------------
             if self.verbose and t % self.log_interval == 0:
-                obj = gmmu_objective(w, b, sample_uncertainty, y, self.lam)
+                obj = gmu_objective(w, b, sample_uncertainty, y, self.lam)
                 self.loss_history_.append(obj)
                 print(f"  iter {t:>6d} / {self.max_iter}  |  objective = {obj:.6f}")
 

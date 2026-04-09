@@ -6,7 +6,7 @@ A scikit-learn-compatible classifier that accounts for per-sample uncertainty mo
 
 ## Report
 
-You can read my detailed report [here](docs/reports/report_1/report.pdf).
+You can read my detailed reports in the [`reports`](docs/reports/) directory.
 
 ## Examples
 

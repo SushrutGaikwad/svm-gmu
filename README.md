@@ -18,7 +18,7 @@ You can find examples of how to use the code in the [`examples`](examples/) dire
 uv sync
 ```
 
-For development (includes pytest and matplotlib):
+For development (includes pytest):
 
 ```bash
 uv sync --extra dev

@@ -28,6 +28,8 @@ import numpy as np
 from scipy.stats import chi2, multivariate_normal
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
     from numpy.typing import NDArray
@@ -409,6 +411,44 @@ def _style_ax(ax: Axes, title: str | None, show_ylabel: bool = True) -> None:
     ax.grid(True, alpha=0.2)
 
 
+def _maybe_savefig(
+    fig: Figure,
+    save_path: str | Path | None,
+    savefig_kwargs: dict | None,
+) -> None:
+    """Save *fig* to *save_path* if one is provided.
+
+    This is a thin convenience wrapper around ``fig.savefig``.  The output
+    format is inferred from the file extension, so any format matplotlib
+    supports (``.pdf``, ``.png``, ``.svg``, ``.pgf``, ``.eps``, ``.jpg``,
+    ...) works out of the box.  Any extra keyword arguments in
+    *savefig_kwargs* are forwarded verbatim to ``fig.savefig``, so the
+    caller has full control over ``dpi``, ``bbox_inches``, ``transparent``,
+    ``facecolor``, ``backend``, and any other option matplotlib exposes.
+
+    A common use case is exporting to ``.pgf`` for inclusion in a LaTeX
+    report via ``\\input{figure.pgf}``::
+
+        plot_boundary_comparison(
+            ...,
+            save_path="figures/comparison.pgf",
+            savefig_kwargs={"bbox_inches": "tight"},
+        )
+
+    Parameters
+    ----------
+    fig : matplotlib Figure
+        The figure to save.
+    save_path : str, Path, or None
+        If None, do nothing.  Otherwise, the filesystem path to save to.
+    savefig_kwargs : dict or None
+        Extra keyword arguments forwarded to ``fig.savefig``.
+    """
+    if save_path is None:
+        return
+    fig.savefig(save_path, **(savefig_kwargs or {}))
+
+
 # ===================================================================
 # Public API
 # ===================================================================
@@ -426,6 +466,8 @@ def plot_uncertainty(
     title: str = "GMM Uncertainty Contours",
     random_state: int | None = 0,
     ax: Axes | None = None,
+    save_path: str | Path | None = None,
+    savefig_kwargs: dict | None = None,
 ) -> tuple[Figure, Axes]:
     """Plot per-sample GMM density contours at configurable sigma levels.
 
@@ -456,6 +498,17 @@ def plot_uncertainty(
         for non-deterministic output.
     ax : matplotlib Axes or None, default=None
         If provided, draw on this axes instead of creating a new figure.
+    save_path : str, Path, or None, default=None
+        If provided, save the figure to this path after drawing.  The
+        format is inferred from the file extension, so any format
+        matplotlib supports works, including ``.pdf``, ``.png``, ``.svg``,
+        and ``.pgf`` (for LaTeX inclusion).  The figure is still returned
+        after saving.
+    savefig_kwargs : dict or None, default=None
+        Extra keyword arguments forwarded to ``fig.savefig`` when
+        *save_path* is set.  Useful options include ``dpi``,
+        ``bbox_inches="tight"``, ``transparent=True``, and ``facecolor``.
+        Ignored when *save_path* is None.
 
     Returns
     -------
@@ -476,6 +529,12 @@ def plot_uncertainty(
     >>> from svm_gmu import SvmGmu
     >>> from svm_gmu.plotting import plot_uncertainty
     >>> fig, ax = plot_uncertainty(X, y, sample_uncertainty)
+    >>> # Save the same figure as a high-DPI PNG and a LaTeX-ready PGF:
+    >>> fig, ax = plot_uncertainty(
+    ...     X, y, sample_uncertainty,
+    ...     save_path="uncertainty.pgf",
+    ...     savefig_kwargs={"bbox_inches": "tight"},
+    ... )
     """
     plt = _require_matplotlib()
     X = np.asarray(X, dtype=np.float64)
@@ -503,6 +562,8 @@ def plot_uncertainty(
     _add_legend(ax, sigmas, include_boundary=False)
     _style_ax(ax, title)
 
+    _maybe_savefig(fig, save_path, savefig_kwargs)
+
     return fig, ax
 
 
@@ -519,6 +580,8 @@ def plot_boundary(
     title: str = "SVM-GMU Decision Boundary",
     random_state: int | None = 0,
     ax: Axes | None = None,
+    save_path: str | Path | None = None,
+    savefig_kwargs: dict | None = None,
 ) -> tuple[Figure, Axes]:
     """Plot a fitted model's decision boundary over the GMM contours.
 
@@ -550,6 +613,16 @@ def plot_boundary(
         Seed for the Monte Carlo sigma-level estimation.
     ax : matplotlib Axes or None, default=None
         If provided, draw on this axes instead of creating a new figure.
+    save_path : str, Path, or None, default=None
+        If provided, save the figure to this path after drawing.  The
+        format is inferred from the file extension, so any format
+        matplotlib supports works, including ``.pdf``, ``.png``, ``.svg``,
+        and ``.pgf`` (for LaTeX inclusion).
+    savefig_kwargs : dict or None, default=None
+        Extra keyword arguments forwarded to ``fig.savefig`` when
+        *save_path* is set.  Useful options include ``dpi``,
+        ``bbox_inches="tight"``, ``transparent=True``, and ``facecolor``.
+        Ignored when *save_path* is None.
 
     Returns
     -------
@@ -573,6 +646,12 @@ def plot_boundary(
     >>> model.fit(X, y, sample_uncertainty=sample_uncertainty)
     SvmGmu(batch_size=1, lam=0.01, max_iter=5000, random_state=42)
     >>> fig, ax = plot_boundary(X, y, sample_uncertainty, model)
+    >>> # Export the figure as PGF for direct \\input{} in a LaTeX report:
+    >>> fig, ax = plot_boundary(
+    ...     X, y, sample_uncertainty, model,
+    ...     save_path="boundary.pgf",
+    ...     savefig_kwargs={"bbox_inches": "tight"},
+    ... )
     """
     plt = _require_matplotlib()
     from sklearn.utils.validation import check_is_fitted
@@ -605,6 +684,8 @@ def plot_boundary(
     _add_legend(ax, sigmas, include_boundary=True)
     _style_ax(ax, title)
 
+    _maybe_savefig(fig, save_path, savefig_kwargs)
+
     return fig, ax
 
 
@@ -623,6 +704,8 @@ def plot_boundary_comparison(
     show_margins: str = "none",
     random_state: int | None = 0,
     ax: Axes | None = None,
+    save_path: str | Path | None = None,
+    savefig_kwargs: dict | None = None,
 ) -> tuple[Figure, Axes]:
     """Overlay two fitted models' decision boundaries on a single plot.
 
@@ -670,6 +753,16 @@ def plot_boundary_comparison(
         Seed for the Monte Carlo sigma-level estimation.
     ax : matplotlib Axes or None, default=None
         If provided, draw on this axes instead of creating a new figure.
+    save_path : str, Path, or None, default=None
+        If provided, save the figure to this path after drawing.  The
+        format is inferred from the file extension, so any format
+        matplotlib supports works, including ``.pdf``, ``.png``, ``.svg``,
+        and ``.pgf`` (for LaTeX inclusion).
+    savefig_kwargs : dict or None, default=None
+        Extra keyword arguments forwarded to ``fig.savefig`` when
+        *save_path* is set.  Useful options include ``dpi``,
+        ``bbox_inches="tight"``, ``transparent=True``, and ``facecolor``.
+        Ignored when *save_path* is None.
 
     Returns
     -------
@@ -697,6 +790,12 @@ def plot_boundary_comparison(
     SvmGmu(lam=0.01, max_iter=5000, random_state=42)
     >>> fig, ax = plot_boundary_comparison(
     ...     X, y, sample_uncertainty, model_gmu, model_svm,
+    ... )
+    >>> # Export as PGF for direct \\input{} in a LaTeX report:
+    >>> fig, ax = plot_boundary_comparison(
+    ...     X, y, sample_uncertainty, model_gmu, model_svm,
+    ...     save_path="comparison.pgf",
+    ...     savefig_kwargs={"bbox_inches": "tight"},
     ... )
     """
     plt = _require_matplotlib()
@@ -784,5 +883,7 @@ def plot_boundary_comparison(
         show_svm_margins=show_svm_margins,
     )
     _style_ax(ax, title)
+
+    _maybe_savefig(fig, save_path, savefig_kwargs)
 
     return fig, ax

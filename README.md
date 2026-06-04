@@ -218,7 +218,7 @@ fig, ax = plot_boundary(X, y, sample_uncertainty, model)
 
 ### Compare SVM-GMU vs. standard SVM
 
-Train both an uncertainty-aware model and a standard SVM, then plot them side by side to see how uncertainty shifts the decision boundary.
+Train both an uncertainty-aware model and a standard SVM, then overlay their decision boundaries on a single plot to see how uncertainty shifts the boundary.
 
 ```python
 model_gmu = SvmGmu(lam=0.01, max_iter=5000, batch_size=1, random_state=42)
@@ -227,7 +227,7 @@ model_gmu.fit(X, y, sample_uncertainty=sample_uncertainty)
 model_svm = SvmGmu(lam=0.01, max_iter=5000, batch_size=1, random_state=42)
 model_svm.fit(X, y)  # no uncertainty -> standard SVM
 
-fig, (ax_left, ax_right) = plot_boundary_comparison(
+fig, ax = plot_boundary_comparison(
     X, y, sample_uncertainty,
     model_gmu, model_svm,
 )
@@ -238,4 +238,4 @@ All three functions accept a `random_state` parameter for reproducible sigma-lev
 ## References
 
 <a id="ref1"></a>
-[1] C. Tzelepis, V. Mezaris, and I. Patras, "Linear Maximum Margin Classifier for Learning from Uncertain Data," *IEEE Transactions on Pattern Analysis and Machine Intelligence*, vol. 40, no. 12, pp. 2948–2262, 2017. [doi.org/10.1109/TPAMI.2017.2772235](https://doi.org/10.1109/TPAMI.2017.2772235)
+[1] C. Tzelepis, V. Mezaris, and I. Patras, "Linear Maximum Margin Classifier for Learning from Uncertain Data," *IEEE Transactions on Pattern Analysis and Machine Intelligence*, vol. 40, no. 12, pp. 2948–2962, 2017. [doi.org/10.1109/TPAMI.2017.2772235](https://doi.org/10.1109/TPAMI.2017.2772235)

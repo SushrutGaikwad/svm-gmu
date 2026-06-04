@@ -36,13 +36,13 @@ The uncertainty tells the classifier: "the true location of this sample is not e
 
 The notation below matches the report:
 
-| Symbol | Meaning |
-|--------|---------|
-| $n$ | Number of training samples |
-| $d$ | Number of features (dimensionality) |
-| $M_i$ | Number of Gaussian components for sample $i$ |
-| $\pi_i^{(m)}$ | Mixing weight of the $m$-th component of sample $i$ |
-| $\boldsymbol{\mu}_i^{(m)}$ | Mean vector $(d,)$ of the $m$-th component of sample $i$ |
+| Symbol                        | Meaning                                                          |
+| ----------------------------- | ---------------------------------------------------------------- |
+| $n$                           | Number of training samples                                       |
+| $d$                           | Number of features (dimensionality)                              |
+| $M_i$                         | Number of Gaussian components for sample $i$                     |
+| $\pi_i^{(m)}$                 | Mixing weight of the $m$-th component of sample $i$              |
+| $\boldsymbol{\mu}_i^{(m)}$    | Mean vector $(d,)$ of the $m$-th component of sample $i$         |
 | $\boldsymbol{\Sigma}_i^{(m)}$ | Covariance matrix $(d, d)$ of the $m$-th component of sample $i$ |
 
 ### Observed data
@@ -145,7 +145,7 @@ model = SvmGmu(lam=0.01, max_iter=1000, batch_size=1, random_state=42)
 model.fit(X, y, sample_uncertainty=sample_uncertainty)
 ```
 
-`fit` learns the weight vector $\mathbf{w}$ and bias $b$ by minimizing the SVM-GMU objective (Eq. 48 in the report):
+`fit` learns the weight vector $\mathbf{w}$ and bias $b$ by minimizing the SVM-GMU objective (Eq. 67 in the report):
 
 $$\mathcal{J}(\mathbf{w}, b) = \frac{\lambda}{2}\|\mathbf{w}\|^2 + \frac{1}{n}\sum_{i=1}^{n}\sum_{m=1}^{M_i} \pi_i^{(m)}\,\mathcal{L}_i^{(m)}(\mathbf{w}, b)$$
 

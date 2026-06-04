@@ -218,7 +218,7 @@ def component_grad_b(y: float, d_mu: float, d_sigma: float) -> float:
     This is the per-component piece inside the sum of Equation 53 (GSU) /
     72 (GMU), without the mixing weight or the 1/n factor:
 
-        dL_i^(m)/db = -y * [erf(d_mu / d_sigma) + 1]
+        dL_i^(m)/db = -(y / 2) * [erf(d_mu / d_sigma) + 1]
 
     Since d_sigma does not depend on b (b does not appear in w^T Sigma w),
     only the d_mu pathway contributes.  The factor (erf(r) + 1) / 2 acts

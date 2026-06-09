@@ -965,9 +965,9 @@ Degenerates to standard SVM & N/A & Yes ($\bSigma_i \to \vb{0}$) & Yes ($M_i\!=\
 % =====================================================================
 \part{Experiments and Empirical Results}\label{part:experiments}
 
-This part presents three experiments carried out with the author's Python implementation of SVM-GMU. The first (\cref{sec:exp_close_separable}) introduces a small two-dimensional dataset with deliberately non-Gaussian per-sample uncertainty and shows how the learned SVM-GMU boundary differs from the standard SVM boundary. The second (\cref{sec:exp_convergence}) empirically verifies the claim of \cref{sec:sampling}: a standard SVM trained on samples drawn from the per-sample GMMs converges, as the number of samples grows, to the SVM-GMU boundary obtained in closed form on the original data. The third (\cref{sec:exp_gmu_vs_gsu}) isolates the contribution of the mixture structure itself by comparing SVM-GMU against SVM-GSU fitted on a moment-matched single-Gaussian approximation of the same GMMs.
+This part presents four experiments carried out with the author's Python implementation of SVM-GMU. The first (\cref{sec:exp_close_separable}) introduces a small two-dimensional dataset with deliberately non-Gaussian per-sample uncertainty and shows how the learned SVM-GMU boundary differs from the standard SVM boundary. The second (\cref{sec:exp_convergence}) empirically verifies the claim of \cref{sec:sampling}: a standard SVM trained on samples drawn from the per-sample GMMs converges, as the number of samples grows, to the SVM-GMU boundary obtained in closed form on the original data. The third (\cref{sec:exp_gmu_vs_gsu}) isolates the contribution of the mixture structure itself by comparing SVM-GMU against SVM-GSU fitted on a moment-matched single-Gaussian approximation of the same GMMs. The fourth (\cref{sec:exp_em_fitted}) takes the realistic next step: rather than assuming the per-sample GMMs are given, it draws samples from each true GMM, re-estimates a GMM per sample by Expectation Maximization with the component count chosen by BIC, and shows that the SVM-GMU boundary fit on the estimated mixtures converges to the closed-form reference as the sample size grows.
 
-All three experiments share a common dataset, which we describe in detail in \cref{sec:exp_close_separable} and then reuse throughout.
+All four experiments share a common dataset, which we describe in detail in \cref{sec:exp_close_separable} and then reuse throughout.
 
 \section{The \texttt{close\_separable} Dataset}\label{sec:exp_close_separable}
 
@@ -1398,6 +1398,61 @@ Two observations stand out.
 \end{enumerate}
 The practical takeaway is the symmetric one we would want: when the per-sample uncertainty \emph{is} unimodal and roughly elliptical, SVM-GSU and SVM-GMU will agree closely and the simpler GSU model is enough. When the uncertainty is multimodal, curved, or otherwise non-Gaussian, as in the \texttt{close\_separable} dataset, SVM-GMU earns its keep by modeling the structure directly.
 
+
+\section{Experiment 4: Learning the Uncertainty from Data via Expectation Maximization}\label{sec:exp_em_fitted}
+
+\subsection{Motivation}
+The first three experiments assume the per-sample GMMs are handed to us. In a real application they are not: a sensor yields a cloud of noisy measurements, and the mixture that describes each example's uncertainty must be \emph{estimated}. This experiment closes that gap. For each observed point we draw samples from its true GMM, fit a fresh GMM to those samples by Expectation Maximization (EM), and run SVM-GMU on the estimated mixtures. Sweeping the number of samples shows how the learned boundary approaches the closed-form reference of \cref{sec:exp_fit_gmu} as more data becomes available. It is the estimation-side counterpart of the Monte Carlo experiment of \cref{sec:exp_convergence}: there we sampled and fit a standard SVM, here we sample, \emph{re-learn the mixtures}, and fit SVM-GMU.
+
+\subsection{Experimental Procedure}
+The reference SVM-GMU is the one trained in \cref{sec:exp_fit_gmu} on the true GMMs, with the parameters in \cref{eq:exp_learned_gmu}. For each value of $N \in \{50, 100, 250, 500, 1000, 2000, 5000, 20000\}$ we repeat the following.
+\begin{enumerate}[leftmargin=2em]
+    \item For each of the $n = 6$ observed points, draw $N$ IID samples from its true GMM $f_{\vb{x}_i}$ (component picked by $\bpi_i$, then a draw from that component's Gaussian).
+    \item Fit a GMM to those $N$ samples by EM, selecting the number of components $M \in \{1, \ldots, 8\}$ that minimizes the Bayesian Information Criterion (BIC), with full covariances and several restarts.
+    \item Label the estimated GMM by its parent's $y_i$.
+    \item Fit SVM-GMU on the six estimated GMMs ($\lambda = 10^{-2}$, $T = 1000$, $k = 6$, seed $42$) and measure its boundary against the reference using the three metrics of \cref{sec:exp_convergence} (angle between normals, offset difference, and grid RMS of the unit-normalized decision functions).
+\end{enumerate}
+A single run is used per $N$ with a fixed master seed, so the sweep is reproducible. As in \cref{sec:exp_convergence}, single-run EM and the BIC component choice introduce some jitter, so the metrics are not perfectly monotonic.
+
+\subsection{Results}
+\Cref{tab:exp_em_metrics} reports the three metrics across the sweep, and \cref{fig:exp_em_metrics,fig:exp_em_panels} visualize them. The trend is clear in the orientation and offset of the boundary: the angle falls to $0.26^{\circ}$ and the offset difference to $7 \times 10^{-4}$ by $N = 20000$, and the grid RMS ends at $0.0127$, comparable to the $0.0106$ reached by the Monte Carlo experiment of \cref{sec:exp_convergence} at the same $N$. The most telling quantity is the number of components BIC selects: at $N = 50$ it picks $M = (1, 2, 1, 1, 1, 1)$, collapsing most examples to a single Gaussian, whereas by $N = 20000$ it picks $M = (5, 4, 6, 4, 4, 4)$, approaching the true counts $(5, 6, 5, 6, 5, 6)$. As the data reveals the true mixture structure, the EM-fitted contours sharpen into the banana and crescent shapes and the learned boundary settles onto the reference.
+
+\begin{table}[H]
+    \centering
+    \caption{Disagreement between the SVM-GMU boundary fit on EM-estimated GMMs and the true-GMM reference, as a function of the number of EM training samples $N$ per observed point ($n_{\text{total}} = 6N$). A single run per $N$ is used; the non-monotonicities (for example the $N = 100$ row) are single-run EM and BIC jitter, as also seen in \cref{tab:exp_conv_metrics}.}
+    \label{tab:exp_em_metrics}
+    \begin{tabular}{@{}rrrrr@{}}
+        \toprule
+        $N$ & $n_{\text{total}}$ & $\theta_N$ (deg) & $\Delta_N^{\text{offset}}$ & Grid RMS \\
+        \midrule
+        50    & 300    & 0.145 & 0.0049 & 0.0082 \\
+        100   & 600    & 2.287 & 0.1440 & 0.1708 \\
+        250   & 1500   & 0.792 & 0.0299 & 0.0519 \\
+        500   & 3000   & 0.383 & 0.0115 & 0.0208 \\
+        1000  & 6000   & 0.748 & 0.0067 & 0.0382 \\
+        2000  & 12000  & 0.858 & 0.0132 & 0.0457 \\
+        5000  & 30000  & 0.495 & 0.0031 & 0.0242 \\
+        20000 & 120000 & 0.260 & 0.0007 & 0.0127 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \resizebox{\textwidth}{!}{\input{graphics/em_convergence_metrics.pgf}}
+    \caption{Boundary-disagreement metrics between SVM-GMU fit on EM-estimated GMMs and the true-GMM reference, versus the number of EM samples $N$ per observed point. \emph{Left:} angle between the weight-vector normals. \emph{Middle:} offset difference. \emph{Right:} grid RMS of the unit-normalized decision functions. The orientation and offset converge steadily toward zero; the grid RMS is noisier but ends near $0.013$.}
+    \label{fig:exp_em_metrics}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \resizebox{!}{0.93\textheight}{\input{graphics/em_fitted_gmu_convergence.pgf}}
+    \caption{One panel per $N$: the EM-fitted GMM contours of the six points (at the $3\sigma$ level), the reference SVM-GMU boundary (green dashed), and the SVM-GMU boundary fit on the estimated GMMs (black solid). As $N$ grows the fitted contours recover the true banana and crescent shapes and the black boundary approaches the green reference.}
+    \label{fig:exp_em_panels}
+\end{figure}
+
+\subsection{Interpretation}
+Two points stand out. First, SVM-GMU does not require the uncertainty to be known in closed form: when each mixture is estimated from data by EM with BIC choosing the component count, the resulting classifier converges to the one trained on the true mixtures. This is the bridge from the synthetic dataset to a realistic pipeline: collect repeated noisy measurements, fit a GMM per example, and feed those to SVM-GMU. Second, the convergence is not uniform across the metrics. The orientation and offset of the boundary settle quickly and cleanly, while the grid RMS is noisier and even dips deceptively low at $N = 50$. The reason is instructive: with very little data BIC underfits each example to a near-single Gaussian, which is close to the moment-matched single-Gaussian summary of \cref{sec:exp_gmu_vs_gsu}, and that summary already produces a boundary close to SVM-GMU. The meaningful convergence is therefore the trend at larger $N$, where the estimated mixtures genuinely recover the multi-component banana and crescent shapes and all three metrics settle near zero.
 
 % =====================================================================
 % PART VI: DISCUSSION

@@ -48,7 +48,7 @@
 % =====================================================================
 \newcommand{\bSigma}{\vb{\Sigma}}
 \newcommand{\bsigma}{\boldsymbol{\upsigma}}
-\newcommand{\bpi}{\boldsymbol{\pi}}
+\newcommand{\bpi}{\boldsymbol{\uppi}}
 \newcommand{\bmu}{\boldsymbol{\upmu}}
 \newcommand{\blambda}{\boldsymbol{\uplambda}}
 \newcommand{\bLambda}{\vb{\Lambda}}
@@ -1263,7 +1263,11 @@ To quantify how close a learned boundary is to the reference SVM-GMU boundary, w
         \Delta_N^{\text{offset}} = \left|\frac{b_N}{\|\vb{w}_N\|} - \frac{b_{\text{ref}}}{\|\vb{w}_{\text{ref}}\|}\right|.
     \end{equation}
     Since $-\frac{b}{\|\vb{w}\|}$ is the signed distance from the origin to the hyperplane, this is the displacement of one boundary relative to the other along their shared normal direction.
-    \item \textbf{Grid RMS:} root-mean-square absolute difference of the two (unit-normalized) decision functions $\widehat{\vb{w}}^{\intercal}\vb{x} + \frac{b}{\|\vb{w}\|}$, evaluated on a $60\times 60$ grid over the plotting window $[-5, 5] \times [-4, 5]$. Captures overall disagreement as a single number, combining orientation and offset.
+    \item \textbf{Grid RMS:} the root-mean-square difference between the two \emph{unit-normalized} decision functions, evaluated on a dense grid. Writing $\hat{f}(\vb{x}) = \widehat{\vb{w}}^{\intercal}\vb{x} + \frac{b}{\|\vb{w}\|}$ for the unit-normalized decision function of a boundary $(\vb{w}, b)$, so that $\hat{f}_N$ is this function built from the learned boundary $(\vb{w}_N, b_N)$ and $\hat{f}_{\text{ref}}$ is the same function built from the reference SVM-GMU boundary $(\vb{w}_{\text{ref}}, b_{\text{ref}})$, and letting $\{\vb{x}_g\}_{g=1}^{G}$ be the $G = 60 \times 60 = 3600$ points of a regular grid over the plotting window $[-5, 5] \times [-4, 5]$,
+    \begin{equation}
+        \Delta_N^{\text{grid}} = \sqrt{\frac{1}{G}\sum_{g=1}^{G}\left(\hat{f}_N(\vb{x}_g) - \hat{f}_{\text{ref}}(\vb{x}_g)\right)^2}.
+    \end{equation}
+    In simple terms: because $\hat{f}(\vb{x})$ is exactly the signed distance from the point $\vb{x}$ to the boundary, this metric goes to every point of the window, asks how differently the two boundaries ``see'' that point (how far each one says the point is from it), squares those differences, averages them, and takes the square root. It is therefore the typical size of the disagreement between the two boundaries across the whole window, expressed as a single number. Unlike the angle and the offset, which isolate orientation and position separately, the grid RMS folds both effects into one overall summary; it is zero only when the two boundaries coincide everywhere in the window.
 \end{itemize}
 If the Monte Carlo argument above is correct, all three metrics should tend to zero as $N \to \infty$.
 
@@ -1402,37 +1406,71 @@ The practical takeaway is the symmetric one we would want: when the per-sample u
 \section{Experiment 4: Learning the Uncertainty from Data via Expectation Maximization}\label{sec:exp_em_fitted}
 
 \subsection{Motivation}
+
 The first three experiments assume the per-sample GMMs are handed to us. In a real application they are not: a sensor yields a cloud of noisy measurements, and the mixture that describes each example's uncertainty must be \emph{estimated}. This experiment closes that gap. For each observed point we draw samples from its true GMM, fit a fresh GMM to those samples by Expectation Maximization (EM), and run SVM-GMU on the estimated mixtures. Sweeping the number of samples shows how the learned boundary approaches the closed-form reference of \cref{sec:exp_fit_gmu} as more data becomes available. It is the estimation-side counterpart of the Monte Carlo experiment of \cref{sec:exp_convergence}: there we sampled and fit a standard SVM, here we sample, \emph{re-learn the mixtures}, and fit SVM-GMU.
 
 \subsection{Experimental Procedure}
+
 The reference SVM-GMU is the one trained in \cref{sec:exp_fit_gmu} on the true GMMs, with the parameters in \cref{eq:exp_learned_gmu}. For each value of $N \in \{50, 100, 250, 500, 1000, 2000, 5000, 20000\}$ we repeat the following.
 \begin{enumerate}[leftmargin=2em]
     \item For each of the $n = 6$ observed points, draw $N$ IID samples from its true GMM $f_{\vb{x}_i}$ (component picked by $\bpi_i$, then a draw from that component's Gaussian).
-    \item Fit a GMM to those $N$ samples by EM, selecting the number of components $M \in \{1, \ldots, 8\}$ that minimizes the Bayesian Information Criterion (BIC), with full covariances and several restarts.
+    \item Fit a GMM to those $N$ samples by EM, selecting the number of components $M \in \{1, \ldots, 8\}$ that minimizes the Bayesian Information Criterion (BIC; see \cref{sec:exp_em_bic}), with full covariances and several restarts.
     \item Label the estimated GMM by its parent's $y_i$.
     \item Fit SVM-GMU on the six estimated GMMs ($\lambda = 10^{-2}$, $T = 1000$, $k = 6$, seed $42$) and measure its boundary against the reference using the three metrics of \cref{sec:exp_convergence} (angle between normals, offset difference, and grid RMS of the unit-normalized decision functions).
 \end{enumerate}
 A single run is used per $N$ with a fixed master seed, so the sweep is reproducible. As in \cref{sec:exp_convergence}, single-run EM and the BIC component choice introduce some jitter, so the metrics are not perfectly monotonic.
 
+\subsection{Model Selection with the Bayesian Information Criterion}\label{sec:exp_em_bic}
+
+Step~2 of the procedure leaves one choice open: how many Gaussian components should the re-estimated mixture have? Too few and the fit cannot capture the banana or crescent shape; too many and the extra components merely chase sampling noise. We resolve this with the \emph{Bayesian Information Criterion} (BIC), a standard model-selection score.
+
+\paragraph{Definition.} For a model fit by maximum likelihood to $N$ data points, the BIC is
+\begin{equation}\label{eq:bic}
+    \mathrm{BIC} = -2\ln\hat{L} + k\ln N,
+\end{equation}
+where $\hat{L}$ is the maximized likelihood of the data under the fitted model, $k$ is the number of free parameters of the model, and $N$ is the number of data points (here, the size of the sampled cloud for one observed example). The score has two competing terms:
+\begin{itemize}[leftmargin=2em]
+    \item The \emph{fit term} $-2\ln\hat{L}$ rewards explaining the data. A better fit means a higher likelihood, which makes this term smaller (more negative). Adding components can only keep the likelihood the same or improve it, so this term decreases as $M$ grows.
+    \item The \emph{complexity penalty} $k\ln N$ punishes using more parameters. It grows with $M$, since each additional component adds parameters.
+\end{itemize}
+
+\paragraph{Parameter count of a GMM.} For a mixture of $M$ Gaussians in $d$ dimensions with full covariances, the free parameters are the $M-1$ independent mixing weights (they sum to one), the $Md$ entries of the means, and the $M\left(\nicefrac{d(d+1)}{2}\right)$ distinct entries of the symmetric covariance matrices:
+\begin{equation}\label{eq:gmm_param_count}
+    k = (M-1) + Md + M\,\frac{d(d+1)}{2}.
+\end{equation}
+In this experiment $d = 2$, so $k = 6M - 1$: every extra component costs six parameters, and the penalty $k\ln N$ rises accordingly.
+
+\paragraph{Why the smallest BIC is chosen.} Lower BIC is better. Selecting the $M$ with the smallest BIC picks the model that best balances fit against complexity. Choosing by likelihood alone would always select the most complex candidate ($M = 8$ here), because more components never hurt the in-sample likelihood; the penalty $k\ln N$ is exactly what prevents that overfitting. Plotted against $M$, the BIC is typically U-shaped: it falls while added components yield genuine likelihood gains, then rises once further components only add parameters without improving the fit. The minimum is the sweet spot between underfitting and overfitting.
+
+\paragraph{Consistency, and the trend in the $M$ column.} The penalty per parameter is $\ln N$, which \emph{grows with the sample size}. This makes BIC consistent: as $N \to \infty$ it recovers the true number of components and resists adding spurious ones. This is exactly the behavior of the $M$ column of \cref{tab:exp_em_metrics}. At $N = 50$ the penalty dominates the modest likelihood gains that a few noisy points can demonstrate, so BIC collapses each example to roughly one component, $M = (1, 2, 1, 1, 1, 1)$. At $N = 20000$ the likelihood improvement from the genuine five to six components in each banana or crescent overwhelms the penalty, and BIC recovers counts near the truth, $M = (5, 4, 6, 4, 4, 4)$.
+
+\paragraph{What BIC compares, and what it does not.} It is worth being precise about the two distinct comparison steps in this experiment, because they operate at different levels.
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{BIC (model selection, upstream).} For a single observed example, the $N$ sampled points are fit by eight candidate GMMs, one for each component count $M \in \{1, \ldots, 8\}$ (each with several EM restarts). BIC compares \emph{these eight fitted mixtures} and keeps the one with the smallest score. This is done independently for each of the $n = 6$ observed examples, so per value of $N$ there are $6 \times 8 = 48$ candidate fits and six selections; this is why $M$ is reported as a six-vector rather than a single number.
+    \item \textbf{Boundary metrics (the measured outcome).} The two SVM-GMU boundaries, the true-GMM reference of \cref{sec:exp_fit_gmu} and the one fit on the BIC-selected estimated GMMs, are compared by the three boundary-disagreement metrics of \cref{sec:exp_convergence} (angle, offset, grid RMS). BIC plays no role in that comparison.
+\end{enumerate}
+In short, BIC only decides how many Gaussians to use when reconstructing each example's uncertainty; it never sees the classifier. The convergence the experiment measures is then assessed separately by the boundary metrics.
+
 \subsection{Results}
+
 \Cref{tab:exp_em_metrics} reports the three metrics across the sweep, and \cref{fig:exp_em_metrics,fig:exp_em_panels} visualize them. The trend is clear in the orientation and offset of the boundary: the angle falls to $0.26^{\circ}$ and the offset difference to $7 \times 10^{-4}$ by $N = 20000$, and the grid RMS ends at $0.0127$, comparable to the $0.0106$ reached by the Monte Carlo experiment of \cref{sec:exp_convergence} at the same $N$. The most telling quantity is the number of components BIC selects: at $N = 50$ it picks $M = (1, 2, 1, 1, 1, 1)$, collapsing most examples to a single Gaussian, whereas by $N = 20000$ it picks $M = (5, 4, 6, 4, 4, 4)$, approaching the true counts $(5, 6, 5, 6, 5, 6)$. As the data reveals the true mixture structure, the EM-fitted contours sharpen into the banana and crescent shapes and the learned boundary settles onto the reference.
 
 \begin{table}[H]
     \centering
-    \caption{Disagreement between the SVM-GMU boundary fit on EM-estimated GMMs and the true-GMM reference, as a function of the number of EM training samples $N$ per observed point ($n_{\text{total}} = 6N$). A single run per $N$ is used; the non-monotonicities (for example the $N = 100$ row) are single-run EM and BIC jitter, as also seen in \cref{tab:exp_conv_metrics}.}
+    \caption{Disagreement between the SVM-GMU boundary fit on EM-estimated GMMs and the true-GMM reference, as a function of the number of EM training samples $N$ per observed point ($n_{\text{total}} = 6N$). The column $M$ lists the BIC-selected number of components for the six observed points $(M_1, \ldots, M_6)$; the true counts are $(5, 6, 5, 6, 5, 6)$. A single run per $N$ is used; the non-monotonicities (for example the $N = 100$ row) are single-run EM and BIC jitter, as also seen in \cref{tab:exp_conv_metrics}.}
     \label{tab:exp_em_metrics}
-    \begin{tabular}{@{}rrrrr@{}}
+    \begin{tabular}{@{}rrrrrc@{}}
         \toprule
-        $N$ & $n_{\text{total}}$ & $\theta_N$ (deg) & $\Delta_N^{\text{offset}}$ & Grid RMS \\
+        $N$ & $n_{\text{total}}$ & $\theta_N$ (deg) & $\Delta_N^{\text{offset}}$ & Grid RMS & $M$ (BIC) \\
         \midrule
-        50    & 300    & 0.145 & 0.0049 & 0.0082 \\
-        100   & 600    & 2.287 & 0.1440 & 0.1708 \\
-        250   & 1500   & 0.792 & 0.0299 & 0.0519 \\
-        500   & 3000   & 0.383 & 0.0115 & 0.0208 \\
-        1000  & 6000   & 0.748 & 0.0067 & 0.0382 \\
-        2000  & 12000  & 0.858 & 0.0132 & 0.0457 \\
-        5000  & 30000  & 0.495 & 0.0031 & 0.0242 \\
-        20000 & 120000 & 0.260 & 0.0007 & 0.0127 \\
+        50    & 300    & 0.145 & 0.0049 & 0.0082 & $(1, 2, 1, 1, 1, 1)$ \\
+        100   & 600    & 2.287 & 0.1440 & 0.1708 & $(2, 2, 1, 1, 1, 1)$ \\
+        250   & 1500   & 0.792 & 0.0299 & 0.0519 & $(3, 2, 1, 2, 2, 2)$ \\
+        500   & 3000   & 0.383 & 0.0115 & 0.0208 & $(3, 3, 1, 2, 2, 3)$ \\
+        1000  & 6000   & 0.748 & 0.0067 & 0.0382 & $(3, 3, 2, 2, 3, 3)$ \\
+        2000  & 12000  & 0.858 & 0.0132 & 0.0457 & $(3, 3, 3, 2, 3, 3)$ \\
+        5000  & 30000  & 0.495 & 0.0031 & 0.0242 & $(5, 4, 5, 3, 3, 3)$ \\
+        20000 & 120000 & 0.260 & 0.0007 & 0.0127 & $(5, 4, 6, 4, 4, 4)$ \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -1452,6 +1490,7 @@ A single run is used per $N$ with a fixed master seed, so the sweep is reproduci
 \end{figure}
 
 \subsection{Interpretation}
+
 Two points stand out. First, SVM-GMU does not require the uncertainty to be known in closed form: when each mixture is estimated from data by EM with BIC choosing the component count, the resulting classifier converges to the one trained on the true mixtures. This is the bridge from the synthetic dataset to a realistic pipeline: collect repeated noisy measurements, fit a GMM per example, and feed those to SVM-GMU. Second, the convergence is not uniform across the metrics. The orientation and offset of the boundary settle quickly and cleanly, while the grid RMS is noisier and even dips deceptively low at $N = 50$. The reason is instructive: with very little data BIC underfits each example to a near-single Gaussian, which is close to the moment-matched single-Gaussian summary of \cref{sec:exp_gmu_vs_gsu}, and that summary already produces a boundary close to SVM-GMU. The meaningful convergence is therefore the trend at larger $N$, where the estimated mixtures genuinely recover the multi-component banana and crescent shapes and all three metrics settle near zero.
 
 % =====================================================================

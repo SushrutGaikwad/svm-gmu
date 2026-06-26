@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _common as C  # noqa: E402
 
 X, y, SAMPLE_UNCERTAINTY = C.X, C.y, C.SAMPLE_UNCERTAINTY
-MASTER_SEED, GRAPHICS_DIR = C.MASTER_SEED, C.GRAPHICS_DIR
+MASTER_SEED = C.MASTER_SEED
 
 R_SEEDS_FULL = 30
 R_SEEDS_SMOKE = 4

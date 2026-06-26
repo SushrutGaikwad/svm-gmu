@@ -41,10 +41,6 @@ FIXED_BUDGETS = [1000, 10000]
 CACHE_DIR = Path(__file__).resolve().parent / ".cache"
 
 
-def svm_iter_for(n_total):
-    return max(2000, 500 * int(np.log10(max(n_total, 10)) + 1))
-
-
 def run_highdim_sweep(d_values, n_ladder, seeds, sigma2_noise):
     """Return dict with angle/offset/rms arrays of shape (len(d), len(seeds), len(ladder))."""
     nd, ns, nl = len(d_values), len(seeds), len(n_ladder)
@@ -60,7 +56,7 @@ def run_highdim_sweep(d_values, n_ladder, seeds, sigma2_noise):
             for ni, n in enumerate(n_ladder):
                 Xc, yc = C.build_sample_cloud(sul, y, n, rng)
                 w_n, b_n = C.fit_gmu(
-                    Xc, yc, None, max_iter=svm_iter_for(len(Xc)),
+                    Xc, yc, None, max_iter=C.svm_iter_for(len(Xc)),
                     seed=C.SVM_SEED, batch_size=256,
                 )
                 a, o, r = C.boundary_metrics(w_n, b_n, w_ref, b_ref, eval_cloud)

@@ -28,18 +28,13 @@ R_SEEDS_FULL = 30
 R_SEEDS_SMOKE = 4
 
 
-def svm_iter_for(n_total):
-    """Scale SGD iterations with cloud size (matches the original notebook)."""
-    return max(2000, 500 * int(np.log10(max(n_total, 10)) + 1))
-
-
 def run_conv_seed(n_values, w_ref, b_ref, seed):
     rng = np.random.default_rng(seed)
     recs = []
     for n in n_values:
         Xc, yc = C.build_sample_cloud(SAMPLE_UNCERTAINTY, y, n, rng)
         w_n, b_n = C.fit_gmu(
-            Xc, yc, None, max_iter=svm_iter_for(len(Xc)),
+            Xc, yc, None, max_iter=C.svm_iter_for(len(Xc)),
             seed=C.SVM_SEED, batch_size=256,
         )
         angle, offset, rms = C.boundary_metrics_2d(w_n, b_n, w_ref, b_ref)

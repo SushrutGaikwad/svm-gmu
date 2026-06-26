@@ -247,6 +247,11 @@ def moment_match_gmm(gmm: dict) -> dict:
     }
 
 
+def svm_iter_for(n_total):
+    """Scale Pegasos SGD iterations with the training-cloud size."""
+    return max(2000, 500 * int(np.log10(max(n_total, 10)) + 1))
+
+
 def fit_gmu(X, y, sample_uncertainty, lam=LAM, max_iter=SVM_ITER, seed=SVM_SEED, batch_size=None):
     """Fit SVM-GMU (or a standard SVM if sample_uncertainty is None); return (w, b)."""
     bs = len(X) if batch_size is None else min(batch_size, len(X))

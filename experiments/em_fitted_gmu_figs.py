@@ -62,10 +62,10 @@ def run_sweep_multiseed(n_values, w_ref, b_ref, seeds):
         print(f"seed {s}: rms@largest_n = {recs[-1]['rms']:.4f}")
     agg = []
     for j, n in enumerate(n_values):
-        angles = np.array([per_seed[s][j]["angle"] for s in range(len(seeds))])
-        offsets = np.array([per_seed[s][j]["offset"] for s in range(len(seeds))])
-        rmss = np.array([per_seed[s][j]["rms"] for s in range(len(seeds))])
-        m_mat = np.array([per_seed[s][j]["m_chosen"] for s in range(len(seeds))])
+        angles = np.array([per_seed[i][j]["angle"] for i in range(len(seeds))])
+        offsets = np.array([per_seed[i][j]["offset"] for i in range(len(seeds))])
+        rmss = np.array([per_seed[i][j]["rms"] for i in range(len(seeds))])
+        m_mat = np.array([per_seed[i][j]["m_chosen"] for i in range(len(seeds))])
         am, alo, ahi = C.band(angles)
         om, olo, ohi = C.band(offsets)
         rm, rlo, rhi = C.band(rmss)

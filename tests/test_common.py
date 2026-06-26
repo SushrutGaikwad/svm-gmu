@@ -78,3 +78,30 @@ def test_moment_match_two_symmetric_components():
     assert np.isclose(out["covariances"][0][1, 1], 0.01)
     # Output is a valid single-sample uncertainty.
     validate_sample_uncertainty([out], n_samples=1, n_features=2)
+
+
+def test_fit_gmu_returns_boundary_shapes():
+    w, b = C.fit_gmu(C.X, C.y, C.SAMPLE_UNCERTAINTY)
+    assert w.shape == (2,)
+    assert isinstance(b, float)
+
+
+def test_build_sample_cloud_shapes_and_labels():
+    Xc, yc = C.build_sample_cloud(C.SAMPLE_UNCERTAINTY, C.y, 10, np.random.default_rng(0))
+    assert Xc.shape == (60, 2)
+    assert yc.shape == (60,)
+    # First 10 rows are sample 0 (label +1), rows 30-40 are sample 3 (label -1).
+    assert np.all(yc[:10] == 1)
+    assert np.all(yc[30:40] == -1)
+
+
+def test_fit_gmm_bic_prefers_two_components():
+    gmm = {
+        "weights": np.array([0.5, 0.5]),
+        "means": np.array([[-3.0, 0.0], [3.0, 0.0]]),
+        "covariances": np.array([np.eye(2) * 0.2, np.eye(2) * 0.2]),
+    }
+    pts = C.sample_from_gmm(gmm, 4000, np.random.default_rng(0))
+    out = C.fit_gmm_bic(pts, [1, 2, 3, 4], n_init=3, seed=0)
+    validate_sample_uncertainty([out], n_samples=1, n_features=2)
+    assert len(out["weights"]) >= 2

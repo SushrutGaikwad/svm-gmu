@@ -247,6 +247,45 @@ def moment_match_gmm(gmm: dict) -> dict:
     }
 
 
+def fit_gmu(X, y, sample_uncertainty, lam=LAM, max_iter=SVM_ITER, seed=SVM_SEED, batch_size=None):
+    """Fit SVM-GMU (or a standard SVM if sample_uncertainty is None); return (w, b)."""
+    bs = len(X) if batch_size is None else min(batch_size, len(X))
+    model = SvmGmu(lam=lam, max_iter=max_iter, batch_size=bs, random_state=seed)
+    model.fit(X, y, sample_uncertainty=sample_uncertainty)
+    return model.coef_.copy(), float(model.intercept_)
+
+
+def fit_gmm_bic(points, m_candidates, n_init, seed) -> dict:
+    """Fit a GMM to points, choosing the component count by minimum BIC."""
+    best_bic = np.inf
+    best_gmm = None
+    for m in m_candidates:
+        gmm = GaussianMixture(
+            n_components=m,
+            covariance_type="full",
+            n_init=n_init,
+            random_state=seed,
+        ).fit(points)
+        bic = gmm.bic(points)
+        if bic < best_bic:
+            best_bic = bic
+            best_gmm = gmm
+    return {
+        "weights": best_gmm.weights_.copy(),
+        "means": best_gmm.means_.copy(),
+        "covariances": best_gmm.covariances_.copy(),
+    }
+
+
+def build_sample_cloud(sample_uncertainty, y, n_per, rng):
+    """Stack n_per draws from every GMM, each labeled by its parent y."""
+    parts_x, parts_y = [], []
+    for gmm, yi in zip(sample_uncertainty, y):
+        parts_x.append(sample_from_gmm(gmm, n_per, rng))
+        parts_y.append(np.full(n_per, yi, dtype=np.float64))
+    return np.vstack(parts_x), np.concatenate(parts_y)
+
+
 def make_convergence_metrics_figure(agg):
     """1x3 median + IQR band panel (angle, offset, grid RMS) vs n. Shared by Exp 2 and 4.
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -90,9 +91,11 @@ def make_nstar_figure(res):
     colors = {1.0: "#dc2626", 2.0: "#2563eb"}
     for tau in TAUS:
         nstar = nstar_from_angles(res, tau)
-        med = np.nanmedian(nstar, axis=1)
-        lo = np.nanpercentile(nstar, 25, axis=1)
-        hi = np.nanpercentile(nstar, 75, axis=1)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            med = np.nanmedian(nstar, axis=1)
+            lo = np.nanpercentile(nstar, 25, axis=1)
+            hi = np.nanpercentile(nstar, 75, axis=1)
         ax.plot(d_values, med, marker="o", color=colors[tau], label=rf"$\tau = {tau:g}^\circ$")
         ax.fill_between(d_values, lo, hi, color=colors[tau], alpha=0.2)
         # Mark dimensions where some seeds never reached tau (cap exceeded).

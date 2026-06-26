@@ -286,6 +286,61 @@ def build_sample_cloud(sample_uncertainty, y, n_per, rng):
     return np.vstack(parts_x), np.concatenate(parts_y)
 
 
+def random_rotation(d, rng):
+    """Return a random orthogonal (d, d) matrix via QR of a Gaussian matrix."""
+    a = rng.standard_normal((d, d))
+    q, r = np.linalg.qr(a)
+    # Fix column signs so the result is deterministic given `a`.
+    q = q * np.sign(np.diag(r))
+    return q
+
+
+def lift_dataset(X, sample_uncertainty, d, sigma2_noise, rng):
+    """Lift the 2D dataset and per-sample GMMs into R^d with a shared rotation.
+
+    The non-Gaussian structure and all class signal stay in the original 2D
+    subspace; the extra d-2 dimensions carry shared isotropic noise of variance
+    sigma2_noise. A single random rotation Q makes the signal subspace
+    non-axis-aligned. Returns (X_lifted, su_lifted, Q).
+    """
+    n, d0 = X.shape
+    if d < d0:
+        raise ValueError(f"target dimension d={d} must be >= base dimension {d0}.")
+    q = random_rotation(d, rng)
+
+    x_pad = np.zeros((n, d))
+    x_pad[:, :d0] = X
+    x_lifted = x_pad @ q.T
+
+    noise_block = sigma2_noise * np.eye(d - d0) if d > d0 else None
+    su_lifted = []
+    for gmm in sample_uncertainty:
+        means = gmm["means"]
+        covs = gmm["covariances"]
+        m_count = means.shape[0]
+        means_pad = np.zeros((m_count, d))
+        means_pad[:, :d0] = means
+        means_lifted = means_pad @ q.T
+        covs_lifted = np.empty((m_count, d, d))
+        for m in range(m_count):
+            full = np.zeros((d, d))
+            full[:d0, :d0] = covs[m]
+            if noise_block is not None:
+                full[d0:, d0:] = noise_block
+            covs_lifted[m] = q @ full @ q.T
+        su_lifted.append({
+            "weights": gmm["weights"].copy(),
+            "means": means_lifted,
+            "covariances": covs_lifted,
+        })
+    return x_lifted, su_lifted, q
+
+
+def mc_eval_cloud(sample_uncertainty, n_per, rng):
+    """Monte Carlo evaluation cloud: n_per draws from every GMM, stacked."""
+    return np.vstack([sample_from_gmm(g, n_per, rng) for g in sample_uncertainty])
+
+
 def make_convergence_metrics_figure(agg):
     """1x3 median + IQR band panel (angle, offset, grid RMS) vs n. Shared by Exp 2 and 4.
 

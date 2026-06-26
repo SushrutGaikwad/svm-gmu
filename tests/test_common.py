@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
+from svm_gmu._loss import compute_d_mu, compute_d_sigma
 from svm_gmu._validation import validate_sample_uncertainty
 
 # Load experiments/_common.py by path (experiments/ is not a package).
@@ -105,3 +106,47 @@ def test_fit_gmm_bic_prefers_two_components():
     out = C.fit_gmm_bic(pts, [1, 2, 3, 4], n_init=3, seed=0)
     validate_sample_uncertainty([out], n_samples=1, n_features=2)
     assert len(out["weights"]) >= 2
+
+
+def test_random_rotation_is_orthogonal():
+    Q = C.random_rotation(7, np.random.default_rng(1))
+    assert Q.shape == (7, 7)
+    assert np.allclose(Q @ Q.T, np.eye(7), atol=1e-10)
+
+
+def test_lift_dataset_shapes_and_psd():
+    rng = np.random.default_rng(2)
+    Xl, sul, Q = C.lift_dataset(C.X, C.SAMPLE_UNCERTAINTY, d=6, sigma2_noise=0.05, rng=rng)
+    assert Xl.shape == (6, 6)
+    assert len(sul) == 6
+    for su in sul:
+        M = su["means"].shape[0]
+        assert su["means"].shape == (M, 6)
+        assert su["covariances"].shape == (M, 6, 6)
+        for cov in su["covariances"]:
+            assert np.allclose(cov, cov.T, atol=1e-10)
+            assert np.linalg.eigvalsh(cov).min() > -1e-8
+
+
+def test_lift_preserves_loss_geometry_in_signal_subspace():
+    # The key invariant: with w_d = Q @ [w2; 0], every component's d_mu and
+    # d_sigma equal their 2D values, because the noise dims carry zero weight.
+    rng = np.random.default_rng(3)
+    d, sigma2 = 9, 0.07
+    Xl, sul, Q = C.lift_dataset(C.X, C.SAMPLE_UNCERTAINTY, d, sigma2, rng)
+    w2 = np.array([-1.2527, 1.2589])
+    b = -0.9470
+    w_d = Q @ np.concatenate([w2, np.zeros(d - 2)])
+    for gmm2, gmmd in zip(C.SAMPLE_UNCERTAINTY, sul):
+        for m in range(len(gmm2["weights"])):
+            dmu2 = compute_d_mu(w2, b, gmm2["means"][m], 1.0)
+            dmud = compute_d_mu(w_d, b, gmmd["means"][m], 1.0)
+            assert np.isclose(dmu2, dmud, atol=1e-9)
+            dsig2 = compute_d_sigma(w2, gmm2["covariances"][m])
+            dsigd = compute_d_sigma(w_d, gmmd["covariances"][m])
+            assert np.isclose(dsig2, dsigd, atol=1e-9)
+
+
+def test_mc_eval_cloud_shape():
+    cloud = C.mc_eval_cloud(C.SAMPLE_UNCERTAINTY, 100, np.random.default_rng(4))
+    assert cloud.shape == (600, 2)

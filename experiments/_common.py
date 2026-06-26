@@ -224,6 +224,29 @@ def configure_pgf():
     })
 
 
+def moment_match_gmm(gmm: dict) -> dict:
+    """Reduce a GMM to one Gaussian with the same overall mean and covariance.
+
+    Uses the law of total covariance: the overall covariance is the weighted
+    average of the component covariances (within) plus the weighted covariance
+    of the component means (between).
+    """
+    weights = gmm["weights"]
+    means = gmm["means"]
+    covs = gmm["covariances"]
+    mu = (weights[:, None] * means).sum(axis=0)
+    within = (weights[:, None, None] * covs).sum(axis=0)
+    diffs = means - mu
+    outers = diffs[:, :, None] * diffs[:, None, :]
+    between = (weights[:, None, None] * outers).sum(axis=0)
+    cov = within + between
+    return {
+        "weights": np.array([1.0]),
+        "means": mu[None, :],
+        "covariances": cov[None, :, :],
+    }
+
+
 def make_convergence_metrics_figure(agg):
     """1x3 median + IQR band panel (angle, offset, grid RMS) vs n. Shared by Exp 2 and 4.
 

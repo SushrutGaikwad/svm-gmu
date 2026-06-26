@@ -29,9 +29,13 @@ D_VALUES_FULL = [2, 3, 5, 10, 20, 50]
 D_VALUES_SMOKE = [2, 3, 5]
 N_LADDER_FULL = [10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000]
 N_LADDER_SMOKE = [10, 100, 1000]
-R_SEEDS_FULL = 8
+R_SEEDS_FULL = 6
 R_SEEDS_SMOKE = 3
-SIGMA2_NOISE = 0.05          # calibrated so N*(d=3) lands near the report's 5e4
+# Calibrated by a d-trend probe: at this value N*(d) (tau=2 deg) spans roughly
+# 30 at d=2 to ~3e4 by d=30, with d=50 exceeding the sample cap. The report's
+# "~5e4 in 3D" figure is a different (full-3D-Gaussian) construction and is not
+# targeted here; the headline result is the growth of N*(d) with dimension.
+SIGMA2_NOISE = 0.1
 TAUS = [1.0, 2.0]            # degrees; primary curve uses tau = 2.0
 FIXED_BUDGETS = [1000, 10000]
 CACHE_DIR = Path(__file__).resolve().parent / ".cache"

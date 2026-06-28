@@ -215,24 +215,14 @@ def band(values):
 def configure_pgf():
     """Render figures with the report's LaTeX serif font (pdflatex + lmodern).
 
-    Sets both the inline (usetex) and the .pgf-export rcParams so the inline
-    preview matches the saved figure. Lazy matplotlib import.
+    Delegates the font setup to ``svm_gmu.plotting.use_latex_serif`` (the single
+    definition) and adds the report's 10pt size. Lazy matplotlib import.
     """
     import matplotlib
-    preamble = "\n".join([
-        r"\usepackage{lmodern}",
-        r"\usepackage{amsmath}",
-        r"\usepackage{bm}",
-    ])
-    matplotlib.rcParams.update({
-        "text.usetex": True,
-        "font.family": "serif",
-        "font.size": 10,
-        "pgf.texsystem": "pdflatex",
-        "pgf.rcfonts": False,
-        "text.latex.preamble": preamble,
-        "pgf.preamble": preamble,
-    })
+    from svm_gmu.plotting import use_latex_serif
+
+    use_latex_serif()
+    matplotlib.rcParams["font.size"] = 10
 
 
 def moment_match_gmm(gmm: dict) -> dict:

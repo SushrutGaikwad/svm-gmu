@@ -454,6 +454,36 @@ def _maybe_savefig(
 # ===================================================================
 
 
+def use_latex_serif() -> None:
+    """Render matplotlib text with the LaTeX serif font (Latin Modern).
+
+    Configures both the on-screen (``text.usetex``) and the PGF-export
+    rcParams so figures produced by this module use the same serif font
+    (``lmodern``) as a LaTeX document, with ``amsmath`` and ``bm`` available
+    in math.  Requires a working LaTeX installation (``pdflatex``).
+
+    Call this once, before drawing, to make figures match a LaTeX report::
+
+        from svm_gmu.plotting import use_latex_serif
+        use_latex_serif()
+    """
+    import matplotlib
+
+    preamble = "\n".join(
+        [r"\usepackage{lmodern}", r"\usepackage{amsmath}", r"\usepackage{bm}"]
+    )
+    matplotlib.rcParams.update(
+        {
+            "text.usetex": True,
+            "font.family": "serif",
+            "pgf.texsystem": "pdflatex",
+            "pgf.rcfonts": False,
+            "text.latex.preamble": preamble,
+            "pgf.preamble": preamble,
+        }
+    )
+
+
 def plot_uncertainty(
     X: NDArray,
     y: NDArray,

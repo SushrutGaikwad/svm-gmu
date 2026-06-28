@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 
-from svm_gmu._loss import compute_d_mu, compute_d_sigma
 from svm_gmu._validation import validate_sample_uncertainty
 
 # Load experiments/_common.py by path (experiments/ is not a package).
@@ -108,43 +107,19 @@ def test_fit_gmm_bic_prefers_two_components():
     assert len(out["weights"]) >= 2
 
 
-def test_random_rotation_is_orthogonal():
-    Q = C.random_rotation(7, np.random.default_rng(1))
-    assert Q.shape == (7, 7)
-    assert np.allclose(Q @ Q.T, np.eye(7), atol=1e-10)
-
-
-def test_lift_dataset_shapes_and_psd():
+def test_make_highdim_gmm_dataset():
     rng = np.random.default_rng(2)
-    Xl, sul, Q = C.lift_dataset(C.X, C.SAMPLE_UNCERTAINTY, d=6, sigma2_noise=0.05, rng=rng)
-    assert Xl.shape == (6, 6)
-    assert len(sul) == 6
-    for su in sul:
-        M = su["means"].shape[0]
-        assert su["means"].shape == (M, 6)
-        assert su["covariances"].shape == (M, 6, 6)
-        for cov in su["covariances"]:
-            assert np.allclose(cov, cov.T, atol=1e-10)
-            assert np.linalg.eigvalsh(cov).min() > -1e-8
-
-
-def test_lift_preserves_loss_geometry_in_signal_subspace():
-    # The key invariant: with w_d = Q @ [w2; 0], every component's d_mu and
-    # d_sigma equal their 2D values, because the noise dims carry zero weight.
-    rng = np.random.default_rng(3)
-    d, sigma2 = 9, 0.07
-    Xl, sul, Q = C.lift_dataset(C.X, C.SAMPLE_UNCERTAINTY, d, sigma2, rng)
-    w2 = np.array([-1.2527, 1.2589])
-    b = -0.9470
-    w_d = Q @ np.concatenate([w2, np.zeros(d - 2)])
-    for gmm2, gmmd in zip(C.SAMPLE_UNCERTAINTY, sul):
-        for m in range(len(gmm2["weights"])):
-            dmu2 = compute_d_mu(w2, b, gmm2["means"][m], 1.0)
-            dmud = compute_d_mu(w_d, b, gmmd["means"][m], 1.0)
-            assert np.isclose(dmu2, dmud, atol=1e-9)
-            dsig2 = compute_d_sigma(w2, gmm2["covariances"][m])
-            dsigd = compute_d_sigma(w_d, gmmd["covariances"][m])
-            assert np.isclose(dsig2, dsigd, atol=1e-9)
+    X, y, su = C.make_highdim_gmm_dataset(d=8, rng=rng, n_per_class=4, n_components=3)
+    assert X.shape == (8, 8)
+    assert set(np.unique(y)) == {1.0, -1.0}
+    assert len(su) == 8
+    for s in su:
+        assert s["means"].shape == (3, 8)
+        assert s["covariances"].shape == (3, 8, 8)
+        assert np.isclose(s["weights"].sum(), 1.0)
+    # A valid, genuinely multi-component (literal GMU) per-sample uncertainty.
+    validate_sample_uncertainty(su, n_samples=8, n_features=8)
+    assert all(len(s["weights"]) > 1 for s in su)
 
 
 def test_mc_eval_cloud_shape():

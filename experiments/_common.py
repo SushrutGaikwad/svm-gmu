@@ -291,54 +291,37 @@ def build_sample_cloud(sample_uncertainty, y, n_per, rng):
     return np.vstack(parts_x), np.concatenate(parts_y)
 
 
-def random_rotation(d, rng):
-    """Return a random orthogonal (d, d) matrix via QR of a Gaussian matrix."""
-    a = rng.standard_normal((d, d))
-    q, r = np.linalg.qr(a)
-    # Fix column signs so the result is deterministic given `a`.
-    q = q * np.sign(np.diag(r))
-    return q
+def make_highdim_gmm_dataset(
+    d, rng, n_per_class=5, n_components=3, sep=2.0, jitter=0.5, spread=0.9, sigma=1.1
+):
+    """Build a genuinely d-dimensional GMM-per-example dataset (two close classes).
 
-
-def lift_dataset(X, sample_uncertainty, d, sigma2_noise, rng):
-    """Lift the 2D dataset and per-sample GMMs into R^d with a shared rotation.
-
-    The non-Gaussian structure and all class signal stay in the original 2D
-    subspace; the extra d-2 dimensions carry shared isotropic noise of variance
-    sigma2_noise. A single random rotation Q makes the signal subspace
-    non-axis-aligned. Returns (X_lifted, su_lifted, Q).
+    Each example is a real ``n_components``-component isotropic Gaussian mixture
+    in R^d: the component means are offset from the example center in random
+    d-dimensional directions, and every component has covariance sigma^2 I_d. The
+    two classes are separated along the first axis (with off-axis jitter so the
+    optimal boundary is genuinely d-dimensional) and placed close enough that
+    their uncertainty overlaps. Returns ``(X, y, sample_uncertainty)``, where each
+    row of X is the example's overall mean. Fitting the closed form on this is
+    literally SVM-GMU (every example has more than one component).
     """
-    n, d0 = X.shape
-    if d < d0:
-        raise ValueError(f"target dimension d={d} must be >= base dimension {d0}.")
-    q = random_rotation(d, rng)
-
-    x_pad = np.zeros((n, d))
-    x_pad[:, :d0] = X
-    x_lifted = x_pad @ q.T
-
-    noise_block = sigma2_noise * np.eye(d - d0) if d > d0 else None
-    su_lifted = []
-    for gmm in sample_uncertainty:
-        means = gmm["means"]
-        covs = gmm["covariances"]
-        m_count = means.shape[0]
-        means_pad = np.zeros((m_count, d))
-        means_pad[:, :d0] = means
-        means_lifted = means_pad @ q.T
-        covs_lifted = np.empty((m_count, d, d))
-        for m in range(m_count):
-            full = np.zeros((d, d))
-            full[:d0, :d0] = covs[m]
-            if noise_block is not None:
-                full[d0:, d0:] = noise_block
-            covs_lifted[m] = q @ full @ q.T
-        su_lifted.append({
-            "weights": gmm["weights"].copy(),
-            "means": means_lifted,
-            "covariances": covs_lifted,
-        })
-    return x_lifted, su_lifted, q
+    X, y, su = [], [], []
+    for cls in (1.0, -1.0):
+        for _ in range(n_per_class):
+            center = jitter * rng.standard_normal(d)
+            center[0] += cls * sep
+            dirs = rng.standard_normal((n_components, d))
+            dirs /= np.linalg.norm(dirs, axis=1, keepdims=True)
+            means = center + spread * dirs
+            covs = np.stack([sigma**2 * np.eye(d) for _ in range(n_components)])
+            su.append({
+                "weights": np.full(n_components, 1.0 / n_components),
+                "means": means,
+                "covariances": covs,
+            })
+            X.append(means.mean(axis=0))
+            y.append(cls)
+    return np.array(X), np.array(y), su
 
 
 def mc_eval_cloud(sample_uncertainty, n_per, rng):

@@ -213,14 +213,25 @@ def band(values):
 
 
 def configure_pgf():
-    """Set matplotlib pgf rcParams (10pt serif, amsmath+bm). Lazy matplotlib import."""
+    """Render figures with the report's LaTeX serif font (pdflatex + lmodern).
+
+    Sets both the inline (usetex) and the .pgf-export rcParams so the inline
+    preview matches the saved figure. Lazy matplotlib import.
+    """
     import matplotlib
+    preamble = "\n".join([
+        r"\usepackage{lmodern}",
+        r"\usepackage{amsmath}",
+        r"\usepackage{bm}",
+    ])
     matplotlib.rcParams.update({
-        "pgf.texsystem": "pdflatex",
+        "text.usetex": True,
         "font.family": "serif",
         "font.size": 10,
+        "pgf.texsystem": "pdflatex",
         "pgf.rcfonts": False,
-        "pgf.preamble": "\n".join([r"\usepackage{amsmath}", r"\usepackage{bm}"]),
+        "text.latex.preamble": preamble,
+        "pgf.preamble": preamble,
     })
 
 

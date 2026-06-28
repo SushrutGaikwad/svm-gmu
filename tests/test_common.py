@@ -125,3 +125,16 @@ def test_make_highdim_gmm_dataset():
 def test_mc_eval_cloud_shape():
     cloud = C.mc_eval_cloud(C.SAMPLE_UNCERTAINTY, 100, np.random.default_rng(4))
     assert cloud.shape == (600, 2)
+
+
+def test_configure_pgf_sets_latex_serif():
+    import matplotlib
+
+    C.configure_pgf()
+    rc = matplotlib.rcParams
+    assert rc["text.usetex"] is True
+    assert rc["font.family"] == ["serif"]
+    assert rc["pgf.texsystem"] == "pdflatex"
+    assert rc["pgf.rcfonts"] is False
+    assert "lmodern" in rc["pgf.preamble"]
+    assert "lmodern" in rc["text.latex.preamble"]

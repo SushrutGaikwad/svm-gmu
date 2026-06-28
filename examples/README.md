@@ -40,8 +40,6 @@ boundary. This is the same `close_separable` dataset used by the report's first
 four experiments. With `lam = 0.01`, `max_iter = 1000`, `batch_size = 6`,
 `random_state = 42`, SVM-GMU converges to `w = [-1.2527, 1.2589]`,
 `b = -0.9470`, while the standard SVM settles on a visibly different boundary.
-A final "Saving the plots" section shows how to export a figure with the
-`save_path` argument; it writes `comparison.{png,pdf,pgf}` into `figures/`.
 
 ### `banana_crescent.ipynb`
 
@@ -79,6 +77,8 @@ The three plotting helpers take the data plus a fitted model (except
 
 ## Output
 
-`close_separable.ipynb` writes its exported figures into `figures/` (created on
-demand and not tracked by git). The example notebooks do **not** write into the
-report's `graphics/` directory; that is the job of the experiment notebooks.
+Both notebooks display their figures inline only and do not write to disk. To
+export a figure yourself, pass `save_path` (and optionally `savefig_kwargs`) to
+any plotting function. The report's figures are generated separately by the
+experiment notebooks in [`../experiments/`](../experiments/), which write `.pgf`
+files into `docs/reports/report_3/graphics/`.

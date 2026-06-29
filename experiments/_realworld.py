@@ -13,7 +13,6 @@ from scipy.stats import binomtest, ttest_rel, wilcoxon
 from sklearn.decomposition import PCA
 from sklearn.metrics import (
     accuracy_score,
-    accuracy_score as _acc,
     average_precision_score,
     f1_score,
     roc_auc_score,
@@ -208,7 +207,7 @@ def select_lambda_cv(X, y, su, lam_grid, n_folds, seed, svm_kwargs) -> float:
             su_tr = None if su is None else [su[i] for i in tr]
             model = SvmGmu(lam=lam, random_state=seed, **svm_kwargs)
             model.fit(X[tr], y[tr], sample_uncertainty=su_tr)
-            fold_acc.append(_acc(y[va], model.predict(X[va])))
+            fold_acc.append(accuracy_score(y[va], model.predict(X[va])))
         mean_acc = float(np.mean(fold_acc))
         if mean_acc > best_acc:
             best_acc, best_lam = mean_acc, lam
@@ -283,7 +282,13 @@ def run_mnist_seed(
     models = run_ladder(X_tr, y_tr, X_te, y_te, su_by_model, lam_grid, n_folds, svm_kwargs, seed)
 
     mcnemar_p = mcnemar_pvalue(y_te, models["M2"]["y_pred"], models["M0"]["y_pred"])
-    return {"models": models, "mcnemar_p": mcnemar_p, "bic_counts": bic_counts}
+    return {
+        "models": models,
+        "mcnemar_p": mcnemar_p,
+        "bic_counts": bic_counts,
+        "clouds_pca": clouds_pca,
+        "y_tr": y_tr,
+    }
 
 
 _MODEL_KEYS = ["B0", "B1", "M0", "M1", "M2"]
@@ -295,6 +300,7 @@ _MODEL_COLORS = {
     "B0": "#9ca3af", "B1": "#f59e0b", "M0": "#2563eb",
     "M1": "#10b981", "M2": "#dc2626",
 }
+_CLASS_PANEL_COLORS = {1.0: "#2563eb", -1.0: "#dc2626"}
 _METRIC_KEYS = ["accuracy", "f1", "auc", "ap"]
 
 
@@ -379,29 +385,49 @@ def make_sweep_figure(sweep: dict, xlabel: str, title: str):
 
 
 def plot_mnist_2d_panel(images, labels, config, seed):
-    """2D PCA panel: augmentation clouds, M0/M1/M2 component contours, boundaries.
+    """2D PCA panel of the MNIST GMU-vs-GSU comparison.
 
-    Builds one seed at pca_dim=2 with full covariances and overlays the fitted
-    SVM-GMU/GSU boundaries on the per-example clouds of one positive and one
-    negative training image, using the learned w, b parameters.
+    Scatters one representative augmentation cloud per class in a 2D PCA space
+    and overlays the SVM-GSU (M0) and SVM-GMU (M1 structural, M2 EM) decision
+    boundaries, drawn across the cloud extent. The models are fit at pca_dim=2
+    with full covariances. Only decision boundaries are drawn, not component
+    contours.
     """
     import matplotlib.pyplot as plt
 
-    panel_cfg = dict(config)
-    panel_cfg.update(pca_dim=2, cov_type="full", fixed_n_train=config["fixed_n_train"])
+    panel_config = {**config, "pca_dim": 2, "cov_type": "full"}
     out = run_mnist_seed(
         images, labels, config["digit_pos"], config["digit_neg"], seed,
-        **_per_seed_kwargs(panel_cfg, config["fixed_n_train"], config["fixed_R"]),
+        **_per_seed_kwargs(panel_config, config["fixed_n_train"], config["fixed_R"]),
     )
+    clouds_pca = out["clouds_pca"]
+    y_tr = out["y_tr"]
+
     fig, ax = plt.subplots(figsize=(7, 6))
+
+    shown = set()
+    for cloud, yi in zip(clouds_pca, y_tr):
+        if yi in shown:
+            continue
+        shown.add(yi)
+        label = "class +1 cloud" if yi > 0 else "class -1 cloud"
+        ax.scatter(
+            cloud[:, 0], cloud[:, 1], s=6, alpha=0.25,
+            color=_CLASS_PANEL_COLORS[yi], label=label,
+        )
+
+    all_pts = np.vstack(clouds_pca)
+    xs = np.array([all_pts[:, 0].min(), all_pts[:, 0].max()])
     for mkey in ("M0", "M1", "M2"):
         w = out["models"][mkey]["w"]
         b = out["models"][mkey]["b"]
-        xs = np.linspace(-1, 1, 2)
         if abs(w[1]) > 1e-9:
             ys = -(w[0] * xs + b) / w[1]
             ax.plot(xs, ys, color=_MODEL_COLORS[mkey], label=_MODEL_LABELS[mkey])
-    ax.set_title("SVM-GMU vs SVM-GSU boundaries (2D PCA of MNIST clouds)")
+
+    ax.set_xlabel("PCA dim 1")
+    ax.set_ylabel("PCA dim 2")
+    ax.set_title("SVM-GMU vs SVM-GSU boundaries on MNIST augmentation clouds (2D PCA)")
     ax.legend(fontsize=8)
     fig.tight_layout()
     return fig

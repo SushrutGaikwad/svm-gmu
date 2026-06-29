@@ -200,6 +200,22 @@ def test_run_mnist_experiment_smoke():
     assert len(cell) == 3
 
 
+def test_plot_mnist_2d_panel_runs():
+    import matplotlib
+    matplotlib.use("Agg")
+    images, labels = _fake_mnist(np.random.default_rng(5))
+    config = dict(
+        digit_pos=4, digit_neg=9, master_seed=2026, n_seeds=2,
+        rot_ladder=[20.0], train_ladder=[8], fixed_R=20.0, fixed_n_train=8,
+        n_test=8, n_aug=40, max_shift=1.0, pca_dim=20, k_anchors=4, n_per_anchor=15,
+        lam_grid=[1e-2, 1e-1], n_folds=3, svm_kwargs=dict(max_iter=300, batch_size=8),
+        cov_type="diag",
+    )
+    fig = RW.plot_mnist_2d_panel(images, labels, config, seed=0)
+    assert fig is not None
+    assert len(fig.axes) >= 1
+
+
 def test_make_sweep_figure_runs():
     import matplotlib
     matplotlib.use("Agg")

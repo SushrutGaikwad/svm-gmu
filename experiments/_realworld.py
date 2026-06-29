@@ -21,6 +21,7 @@ from sklearn.metrics import (
 from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import StratifiedKFold
 
+from _common import band, make_seeds
 from svm_gmu import SvmGmu
 
 
@@ -280,3 +281,66 @@ def run_mnist_seed(
 
     mcnemar_p = mcnemar_pvalue(y_te, models["M2"]["y_pred"], models["M0"]["y_pred"])
     return {"models": models, "mcnemar_p": mcnemar_p, "bic_counts": bic_counts}
+
+
+_MODEL_KEYS = ["B0", "B1", "M0", "M1", "M2"]
+_METRIC_KEYS = ["accuracy", "f1", "auc", "ap"]
+
+
+def _per_seed_kwargs(config, n_train, rot_range):
+    return dict(
+        n_train=n_train, n_test=config["n_test"], n_aug=config["n_aug"],
+        rot_range=rot_range, max_shift=config["max_shift"], pca_dim=config["pca_dim"],
+        k_anchors=config["k_anchors"], n_per_anchor=config["n_per_anchor"],
+        lam_grid=config["lam_grid"], n_folds=config["n_folds"],
+        svm_kwargs=config["svm_kwargs"], cov_type=config["cov_type"],
+    )
+
+
+def _aggregate_cell(per_seed_runs):
+    """per_seed_runs: list of run_mnist_seed outputs. Return model -> metric -> band."""
+    cell = {}
+    for mkey in _MODEL_KEYS:
+        cell[mkey] = {}
+        for metric in _METRIC_KEYS:
+            vals = [r["models"][mkey]["metrics"][metric] for r in per_seed_runs]
+            cell[mkey][metric] = band(vals)
+    return cell
+
+
+def run_mnist_experiment(images, labels, config) -> dict:
+    """Multi-seed MNIST sweep over rotation range and training size."""
+    seeds = make_seeds(config["master_seed"], config["n_seeds"])
+
+    rot_sweep = {}
+    for R in config["rot_ladder"]:
+        runs = [
+            run_mnist_seed(images, labels, config["digit_pos"], config["digit_neg"], s,
+                           **_per_seed_kwargs(config, config["fixed_n_train"], R))
+            for s in seeds
+        ]
+        rot_sweep[R] = _aggregate_cell(runs)
+
+    train_sweep = {}
+    for n_tr in config["train_ladder"]:
+        runs = [
+            run_mnist_seed(images, labels, config["digit_pos"], config["digit_neg"], s,
+                           **_per_seed_kwargs(config, n_tr, config["fixed_R"]))
+            for s in seeds
+        ]
+        train_sweep[n_tr] = _aggregate_cell(runs)
+
+    # Significance of GMU (M2) vs GSU (M0) at the fixed operating point.
+    ref_runs = [
+        run_mnist_seed(images, labels, config["digit_pos"], config["digit_neg"], s,
+                       **_per_seed_kwargs(config, config["fixed_n_train"], config["fixed_R"]))
+        for s in seeds
+    ]
+    acc_m2 = [r["models"]["M2"]["metrics"]["accuracy"] for r in ref_runs]
+    acc_m0 = [r["models"]["M0"]["metrics"]["accuracy"] for r in ref_runs]
+    significance = {
+        "paired_seed": paired_seed_tests(acc_m2, acc_m0),
+        "mcnemar_p_median": float(np.median([r["mcnemar_p"] for r in ref_runs])),
+        "bic_counts_median": float(np.median([np.mean(r["bic_counts"]) for r in ref_runs])),
+    }
+    return {"rot_sweep": rot_sweep, "train_sweep": train_sweep, "significance": significance}

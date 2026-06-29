@@ -163,3 +163,31 @@ def test_run_mnist_seed_smoke():
     assert {"B0", "B1", "M0", "M1", "M2"}.issubset(out["models"].keys())
     assert "mcnemar_p" in out and 0.0 <= out["mcnemar_p"] <= 1.0
     assert len(out["bic_counts"]) == 20  # n_train per class x 2 = 20 training mixtures
+
+
+def _fake_mnist(rng):
+    imgs, labs = [], []
+    for _ in range(40):
+        im = np.zeros((28, 28)); im[5:11, :] = rng.uniform(0.5, 1.0, (6, 28))
+        imgs.append(im.ravel()); labs.append(4)
+    for _ in range(40):
+        im = np.zeros((28, 28)); im[17:23, :] = rng.uniform(0.5, 1.0, (6, 28))
+        imgs.append(im.ravel()); labs.append(9)
+    return np.array(imgs), np.array(labs)
+
+
+def test_run_mnist_experiment_smoke():
+    images, labels = _fake_mnist(np.random.default_rng(1))
+    config = dict(
+        digit_pos=4, digit_neg=9, master_seed=2026, n_seeds=2,
+        rot_ladder=[0.0, 20.0], train_ladder=[8], fixed_R=20.0, fixed_n_train=8,
+        n_test=8, n_aug=40, max_shift=1.0, pca_dim=5, k_anchors=4, n_per_anchor=15,
+        lam_grid=[1e-2, 1e-1], n_folds=3, svm_kwargs=dict(max_iter=300, batch_size=8),
+        cov_type="diag",
+    )
+    res = RW.run_mnist_experiment(images, labels, config)
+    assert "rot_sweep" in res and "train_sweep" in res and "significance" in res
+    assert set(res["rot_sweep"].keys()) == {0.0, 20.0}
+    # Each cell holds per-model metric bands (median, q25, q75).
+    cell = res["rot_sweep"][20.0]["M2"]["accuracy"]
+    assert len(cell) == 3

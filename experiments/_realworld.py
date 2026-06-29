@@ -23,7 +23,7 @@ def moment_gaussian(cloud: NDArray[np.floating], cov_type: str = "diag") -> dict
         covs = var[None, :]
     elif cov_type == "full":
         d = cloud.shape[1]
-        cov = np.cov(cloud, rowvar=False) + _VAR_FLOOR * np.eye(d)
+        cov = np.cov(cloud, rowvar=False, bias=True) + _VAR_FLOOR * np.eye(d)
         covs = cov[None, :, :]
     else:
         raise ValueError(f"cov_type must be 'diag' or 'full', got {cov_type!r}.")

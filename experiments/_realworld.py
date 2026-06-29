@@ -11,6 +11,38 @@ from numpy.typing import NDArray
 from scipy import ndimage
 
 
+_VAR_FLOOR = 1e-6
+
+
+def moment_gaussian(cloud: NDArray[np.floating], cov_type: str = "diag") -> dict:
+    """Single-Gaussian uncertainty (SVM-GSU) by moment matching the cloud."""
+    cloud = np.asarray(cloud, dtype=np.float64)
+    mu = cloud.mean(axis=0)
+    if cov_type == "diag":
+        var = np.maximum(cloud.var(axis=0), _VAR_FLOOR)
+        covs = var[None, :]
+    elif cov_type == "full":
+        d = cloud.shape[1]
+        cov = np.cov(cloud, rowvar=False) + _VAR_FLOOR * np.eye(d)
+        covs = cov[None, :, :]
+    else:
+        raise ValueError(f"cov_type must be 'diag' or 'full', got {cov_type!r}.")
+    return {"weights": np.array([1.0]), "means": mu[None, :], "covariances": covs}
+
+
+def iso_gaussian(cloud: NDArray[np.floating]) -> dict:
+    """Single isotropic-diagonal Gaussian (LSVM-iso baseline)."""
+    cloud = np.asarray(cloud, dtype=np.float64)
+    mu = cloud.mean(axis=0)
+    var = max(float(cloud.var(axis=0).mean()), _VAR_FLOOR)
+    d = cloud.shape[1]
+    return {
+        "weights": np.array([1.0]),
+        "means": mu[None, :],
+        "covariances": np.full((1, d), var),
+    }
+
+
 def augment_image(
     img28: NDArray[np.floating],
     rng: np.random.Generator,

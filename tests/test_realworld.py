@@ -36,3 +36,26 @@ def test_augmentation_cloud_shape_and_zero_range():
     cloud = RW.augmentation_cloud(img, n_aug=16, rng=rng, rot_range=0.0, max_shift=0.0)
     assert cloud.shape == (16, 784)
     assert np.allclose(cloud, img[None, :], atol=1e-6)
+
+
+def test_moment_gaussian_diag():
+    cloud = np.array([[0.0, 0.0], [2.0, 0.0], [0.0, 2.0], [2.0, 2.0]])
+    g = RW.moment_gaussian(cloud, "diag")
+    assert g["weights"].shape == (1,) and np.isclose(g["weights"][0], 1.0)
+    assert np.allclose(g["means"][0], [1.0, 1.0])
+    assert g["covariances"].shape == (1, 2)
+    assert np.allclose(g["covariances"][0], [1.0, 1.0])
+
+
+def test_moment_gaussian_full_shape():
+    rng = np.random.default_rng(0)
+    cloud = rng.normal(size=(50, 3))
+    g = RW.moment_gaussian(cloud, "full")
+    assert g["covariances"].shape == (1, 3, 3)
+
+
+def test_iso_gaussian_is_isotropic():
+    cloud = np.array([[0.0, 0.0], [4.0, 0.0], [0.0, 0.0], [4.0, 0.0]])
+    g = RW.iso_gaussian(cloud)
+    assert g["covariances"].shape == (1, 2)
+    assert np.allclose(g["covariances"][0], [2.0, 2.0])  # mean of per-dim var (4, 0)

@@ -287,6 +287,14 @@ def run_mnist_seed(
 
 
 _MODEL_KEYS = ["B0", "B1", "M0", "M1", "M2"]
+_MODEL_LABELS = {
+    "B0": "LSVM (point)", "B1": "LSVM-iso", "M0": "SVM-GSU",
+    "M1": "SVM-GMU (structural)", "M2": "SVM-GMU (EM)",
+}
+_MODEL_COLORS = {
+    "B0": "#9ca3af", "B1": "#f59e0b", "M0": "#2563eb",
+    "M1": "#10b981", "M2": "#dc2626",
+}
 _METRIC_KEYS = ["accuracy", "f1", "auc", "ap"]
 
 
@@ -347,3 +355,53 @@ def run_mnist_experiment(images, labels, config) -> dict:
         "bic_counts_median": float(np.median([np.mean(r["bic_counts"]) for r in ref_runs])),
     }
     return {"rot_sweep": rot_sweep, "train_sweep": train_sweep, "significance": significance}
+
+
+def make_sweep_figure(sweep: dict, xlabel: str, title: str):
+    """Median accuracy with IQR bands per model versus the swept variable."""
+    import matplotlib.pyplot as plt
+
+    xs = sorted(sweep.keys())
+    fig, ax = plt.subplots(figsize=(7, 5))
+    for mkey in _MODEL_KEYS:
+        med = [sweep[x][mkey]["accuracy"][0] for x in xs]
+        lo = [sweep[x][mkey]["accuracy"][1] for x in xs]
+        hi = [sweep[x][mkey]["accuracy"][2] for x in xs]
+        ax.plot(xs, med, marker="o", color=_MODEL_COLORS[mkey], label=_MODEL_LABELS[mkey])
+        ax.fill_between(xs, lo, hi, color=_MODEL_COLORS[mkey], alpha=0.15)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Test accuracy")
+    ax.set_title(title)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    return fig
+
+
+def plot_mnist_2d_panel(images, labels, config, seed):
+    """2D PCA panel: augmentation clouds, M0/M1/M2 component contours, boundaries.
+
+    Builds one seed at pca_dim=2 with full covariances and overlays the fitted
+    SVM-GMU/GSU boundaries on the per-example clouds of one positive and one
+    negative training image, using the learned w, b parameters.
+    """
+    import matplotlib.pyplot as plt
+
+    panel_cfg = dict(config)
+    panel_cfg.update(pca_dim=2, cov_type="full", fixed_n_train=config["fixed_n_train"])
+    out = run_mnist_seed(
+        images, labels, config["digit_pos"], config["digit_neg"], seed,
+        **_per_seed_kwargs(panel_cfg, config["fixed_n_train"], config["fixed_R"]),
+    )
+    fig, ax = plt.subplots(figsize=(7, 6))
+    for mkey in ("M0", "M1", "M2"):
+        w = out["models"][mkey]["w"]
+        b = out["models"][mkey]["b"]
+        xs = np.linspace(-1, 1, 2)
+        if abs(w[1]) > 1e-9:
+            ys = -(w[0] * xs + b) / w[1]
+            ax.plot(xs, ys, color=_MODEL_COLORS[mkey], label=_MODEL_LABELS[mkey])
+    ax.set_title("SVM-GMU vs SVM-GSU boundaries (2D PCA of MNIST clouds)")
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    return fig

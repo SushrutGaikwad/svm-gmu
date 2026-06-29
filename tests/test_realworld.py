@@ -198,3 +198,20 @@ def test_run_mnist_experiment_smoke():
     # Each cell holds per-model metric bands (median, q25, q75).
     cell = res["rot_sweep"][20.0]["M2"]["accuracy"]
     assert len(cell) == 3
+
+
+def test_make_sweep_figure_runs():
+    import matplotlib
+    matplotlib.use("Agg")
+    images, labels = _fake_mnist(np.random.default_rng(2))
+    config = dict(
+        digit_pos=4, digit_neg=9, master_seed=2026, n_seeds=2,
+        rot_ladder=[0.0, 20.0], train_ladder=[8], fixed_R=20.0, fixed_n_train=8,
+        n_test=8, n_aug=40, max_shift=1.0, pca_dim=5, k_anchors=4, n_per_anchor=15,
+        lam_grid=[1e-2, 1e-1], n_folds=3, svm_kwargs=dict(max_iter=300, batch_size=8),
+        cov_type="diag",
+    )
+    res = RW.run_mnist_experiment(images, labels, config)
+    fig = RW.make_sweep_figure(res["rot_sweep"], xlabel="Rotation range (deg)", title="Accuracy vs rotation")
+    assert fig is not None
+    assert len(fig.axes) >= 1

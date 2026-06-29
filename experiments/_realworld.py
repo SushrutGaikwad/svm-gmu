@@ -162,6 +162,30 @@ def augmentation_cloud(
     return rows
 
 
+def run_ladder(X_tr, y_tr, X_te, y_te, su_by_model, lam_grid, n_folds, svm_kwargs, seed) -> dict:
+    """Fit each model in the ladder and return its boundary, predictions, metrics."""
+    X_tr = np.asarray(X_tr, dtype=np.float64)
+    X_te = np.asarray(X_te, dtype=np.float64)
+    y_tr = np.asarray(y_tr, dtype=np.float64)
+    y_te = np.asarray(y_te, dtype=np.float64)
+    out = {}
+    for key, su in su_by_model.items():
+        lam = select_lambda_cv(X_tr, y_tr, su, lam_grid, n_folds, seed, svm_kwargs)
+        model = SvmGmu(lam=lam, random_state=seed, **svm_kwargs)
+        model.fit(X_tr, y_tr, sample_uncertainty=su)
+        y_pred = model.predict(X_te)
+        y_score = model.decision_function(X_te)
+        out[key] = {
+            "lam": lam,
+            "w": model.coef_.copy(),
+            "b": float(model.intercept_),
+            "y_pred": y_pred,
+            "y_score": y_score,
+            "metrics": evaluate_metrics(y_te, y_pred, y_score),
+        }
+    return out
+
+
 def select_lambda_cv(X, y, su, lam_grid, n_folds, seed, svm_kwargs) -> float:
     """Pick lambda by best mean stratified k-fold validation accuracy."""
     X = np.asarray(X, dtype=np.float64)

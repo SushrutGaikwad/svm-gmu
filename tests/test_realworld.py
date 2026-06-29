@@ -123,3 +123,22 @@ def test_select_lambda_returns_grid_value():
     lam = RW.select_lambda_cv(X, y, None, grid, n_folds=3, seed=0,
                               svm_kwargs=dict(max_iter=500, batch_size=16))
     assert lam in grid
+
+
+def test_run_ladder_keys_and_separable_accuracy():
+    rng = np.random.default_rng(0)
+    X_tr = np.vstack([rng.normal(2, 0.4, (20, 2)), rng.normal(-2, 0.4, (20, 2))])
+    y_tr = np.array([1.0] * 20 + [-1.0] * 20)
+    X_te = np.vstack([rng.normal(2, 0.4, (10, 2)), rng.normal(-2, 0.4, (10, 2))])
+    y_te = np.array([1.0] * 10 + [-1.0] * 10)
+    clouds = [X_tr[i] + 0.05 * rng.normal(size=(30, 2)) for i in range(40)]
+    su_iso = [RW.iso_gaussian(c) for c in clouds]
+    su_m0 = [RW.moment_gaussian(c, "diag") for c in clouds]
+    su_by_model = {"B0": None, "B1": su_iso, "M0": su_m0, "M2": su_m0}
+    res = RW.run_ladder(X_tr, y_tr, X_te, y_te, su_by_model,
+                        lam_grid=[1e-2, 1e-1], n_folds=3,
+                        svm_kwargs=dict(max_iter=500, batch_size=16), seed=0)
+    assert set(res) == {"B0", "B1", "M0", "M2"}
+    for key in res:
+        assert 0.0 <= res[key]["metrics"]["accuracy"] <= 1.0
+    assert res["M0"]["metrics"]["accuracy"] > 0.8

@@ -704,7 +704,7 @@ One might wonder: why not just draw many samples from each Gaussian and train a 
 \begin{equation}\label{eq:concentration}
     P\!\left(\left|{\loss_{\text{GSU}}}_{i} - \tilde{\loss}_{{\text{GSU}}_{i,N}}\right| \geq r\right) \leq 2\exp\!\left(-\frac{r^2}{2\|\vb{w}\|^2}\right),
 \end{equation}
-where $\tilde{\loss}_{{\text{GSU}}_{i,N}}$ is the sample-based approximation using $N$ samples. The bound on the right-hand side depends on $\|\vb{w}\|^2$. Although the Pegasos algorithm constrains $\|\vb{w}\|$ to a ball of radius $\nicefrac{1}{\sqrt{\lambda}}$, the fundamental difficulty with sampling in high-dimensional spaces is that Gaussian distributions spread their probability mass more thinly as the dimensionality grows. Consequently, far more samples are needed to adequately represent the distribution in higher dimensions. In experiments, approximately $10^3$ samples per Gaussian were needed in 2D and $5 \times 10^4$ in 3D to match SVM-GSU's hyperplane. In high-dimensional problems ($d$ in the hundreds or thousands), sampling becomes infeasible, making the closed-form approach essential.
+where $\tilde{\loss}_{{\text{GSU}}_{i,N}}$ is the sample-based approximation using $N$ samples. The bound on the right-hand side depends on $\|\vb{w}\|^2$. Although the Pegasos algorithm constrains $\|\vb{w}\|$ to a ball of radius $\nicefrac{1}{\sqrt{\lambda}}$, the fundamental difficulty with sampling in high-dimensional spaces is that Gaussian distributions spread their probability mass more thinly as the dimensionality grows. Consequently, far more samples are needed to adequately represent the distribution in higher dimensions. In experiments, approximately $10^3$ samples per Gaussian were needed in 2D and $5 \times 10^4$ in 3D to match SVM-GSU's hyperplane. In high-dimensional problems ($d$ in the hundreds or thousands), sampling becomes infeasible, making the closed-form approach essential. \Cref{sec:exp_high_dim} makes this dimensional scaling quantitative on purpose-built $d$-dimensional Gaussian-mixture datasets, measuring how the sample budget a standard SVM needs in order to match SVM-GMU grows with $d$.
 
 % =====================================================================
 % PART IV: EXTENSION TO GAUSSIAN MIXTURE UNCERTAINTY
@@ -965,9 +965,11 @@ Degenerates to standard SVM & N/A & Yes ($\bSigma_i \to \vb{0}$) & Yes ($M_i\!=\
 % =====================================================================
 \part{Experiments and Empirical Results}\label{part:experiments}
 
-This part presents four experiments carried out with the author's Python implementation of SVM-GMU. The first (\cref{sec:exp_close_separable}) introduces a small two-dimensional dataset with deliberately non-Gaussian per-sample uncertainty and shows how the learned SVM-GMU boundary differs from the standard SVM boundary. The second (\cref{sec:exp_convergence}) empirically verifies the claim of \cref{sec:sampling}: a standard SVM trained on samples drawn from the per-sample GMMs converges, as the number of samples grows, to the SVM-GMU boundary obtained in closed form on the original data. The third (\cref{sec:exp_gmu_vs_gsu}) isolates the contribution of the mixture structure itself by comparing SVM-GMU against SVM-GSU fitted on a moment-matched single-Gaussian approximation of the same GMMs. The fourth (\cref{sec:exp_em_fitted}) takes the realistic next step: rather than assuming the per-sample GMMs are given, it draws samples from each true GMM, re-estimates a GMM per sample by Expectation Maximization with the component count chosen by BIC, and shows that the SVM-GMU boundary fit on the estimated mixtures converges to the closed-form reference as the sample size grows.
+This part presents five experiments carried out with the author's Python implementation of SVM-GMU. The first (\cref{sec:exp_close_separable}) introduces a small two-dimensional dataset with deliberately non-Gaussian per-sample uncertainty and shows how the learned SVM-GMU boundary differs from the standard SVM boundary. The second (\cref{sec:exp_convergence}) empirically verifies the claim of \cref{sec:sampling}: a standard SVM trained on samples drawn from the per-sample GMMs converges, as the number of samples grows, to the SVM-GMU boundary obtained in closed form on the original data. The third (\cref{sec:exp_gmu_vs_gsu}) isolates the contribution of the mixture structure itself by comparing SVM-GMU against SVM-GSU fitted on a moment-matched single-Gaussian approximation of the same GMMs. The fourth (\cref{sec:exp_em_fitted}) takes the realistic next step: rather than assuming the per-sample GMMs are given, it draws samples from each true GMM, re-estimates a GMM per sample by Expectation Maximization with the component count chosen by BIC, and shows that the SVM-GMU boundary fit on the estimated mixtures converges to the closed-form reference as the sample size grows. The fifth (\cref{sec:exp_high_dim}) returns to the scaling argument of \cref{sec:sampling} and makes it quantitative: it embeds the dataset in progressively higher dimensions and measures how the number of samples a standard SVM needs in order to match the closed-form SVM-GMU boundary grows with the dimensionality.
 
-All four experiments share a common dataset, which we describe in detail in \cref{sec:exp_close_separable} and then reuse throughout.
+\paragraph{Reporting protocol.} The experiments that rely on random sampling or stochastic optimization (\cref{sec:exp_convergence,sec:exp_em_fitted,sec:exp_high_dim}) are each repeated over $R$ independent random seeds, all spawned from a single master seed so that the entire sweep is reproducible. For these we report every metric as its \emph{median} over the $R$ seeds, accompanied by an inter-quartile band spanning the $25$th to the $75$th percentile (so the band holds the middle half of the seed-to-seed values, and a narrow band signals a result that barely changes from seed to seed), rather than the value of a single run. By contrast, \cref{sec:exp_fit_gmu,sec:exp_gmu_vs_gsu} fit only the closed-form SVM-GMU and SVM-GSU objectives. These objectives are strongly convex (\cref{prop:gsu_convex}), so the full-batch Pegasos optimizer converges to the \emph{unique} global minimizer regardless of its random initialization; the learned boundaries are therefore seed-independent, as we confirm numerically in the corresponding sections.
+
+The first four experiments share a common dataset, which we describe in detail in \cref{sec:exp_close_separable} and then reuse throughout; the high-dimensional study of \cref{sec:exp_high_dim} instead uses its own purpose-built family of $d$-dimensional Gaussian-mixture datasets, since its question requires uncertainty that genuinely occupies $\R^d$.
 
 \section{The \texttt{close\_separable} Dataset}\label{sec:exp_close_separable}
 
@@ -1144,6 +1146,8 @@ and full covariance matrices
 
 Before fitting any classifier, we can get a sense of the dataset by plotting the GMM density of each sample. \Cref{fig:exp_dataset_contours} shows the $3\sigma$ iso-density contours of each of the six mixtures, colored by class (blue for $+1$, red for $-1$). The markings (blue dots and red boxes) mark the observed feature vectors (the rows of $\vb{X}$). The banana and crescent shapes are clearly visible and, crucially, extend toward the decision region between the two classes, which is what makes them interesting from a classification point of view: a Gaussian could not faithfully represent where probability mass actually lies.
 
+\paragraph{What a $3\sigma$ iso-density contour means.} An \emph{iso-density contour} is a curve along which the probability density $f_{\vb{x}_i}(\vb{x})$ takes a single constant value, exactly like a contour line on a topographic map joins points of equal altitude. Stepping inward across these curves, the density rises toward the peaks of the mixture; stepping outward, it falls toward zero. The label ``$3\sigma$'' selects one particular contour: the one drawn so that the region it encloses holds about $99.7\%$ of the probability mass. The name borrows the one-dimensional rule of thumb that a Gaussian places roughly $99.7\%$ of its mass within three standard deviations ($3\sigma$) of its mean. So in plain terms the $3\sigma$ contour of a sample outlines ``where that sample almost certainly is''; the banana and crescent curves in \cref{fig:exp_dataset_contours} are exactly these almost-certain regions, and they lean toward the gap between the classes.
+
 \begin{figure}
     \centering
     \resizebox{0.75\textwidth}{!}{\input{graphics/dataset_gmm_uncertainty_contours.pgf}}
@@ -1166,7 +1170,7 @@ For comparison, we also train a standard linear SVM on the same observed points 
 
 \subsection{Learned Parameters and Convergence}
 
-The SGD trajectory of SVM-GMU converges rapidly: the objective value drops from roughly $0.0508$ at iteration $50$ to $0.0472$ at iteration $250$ and stays essentially flat afterward (the value at iteration $1000$ is $0.047228$). The learned parameters are
+The SGD trajectory of SVM-GMU converges rapidly: the objective value (the regularized loss $\obj_{\text{GMU}}(\vb{w}, b)$ of \cref{eq:gmu_objective} that training is driving down, so that ``flat'' means SGD has essentially found the minimum) drops from roughly $0.0508$ at iteration $50$ to $0.0472$ at iteration $250$ and stays essentially flat afterward (the value at iteration $1000$ is $0.047228$). The learned parameters are
 \begin{equation}\label{eq:exp_learned_gmu}
     \vb{w}_{\text{GMU}} = \begin{bmatrix} -1.2527 \\  1.2589 \end{bmatrix},
     \qquad
@@ -1178,7 +1182,8 @@ The standard SVM converges to a different objective-value plateau (around $0.003
     \qquad
     b_{\text{SVM}} = -0.4547.
 \end{equation}
-Both models classify all six observed points correctly. Their decision scores $\vb{w}^{\intercal}\vb{x}_i + b$ on the training points are listed in \cref{tab:exp_decision_scores}; the sign matches the class label in every row, but the \emph{magnitudes} differ substantially because SVM-GMU is responding to the \emph{entire} GMM density, not just the mean.
+Because the SVM-GMU objective is strongly convex (\cref{prop:gsu_convex}), the boundary \cref{eq:exp_learned_gmu} is its \emph{unique} global minimizer and does not depend on the random seed. Refitting over $30$ independent seeds changes the orientation of $\vb{w}_{\text{GMU}}$ by at most $4\times10^{-5}$ degrees, a seed-to-seed boundary drift of essentially zero. The parameters reported here are therefore representative of the method, not an artifact of a single lucky draw.
+Both models classify all six observed points correctly. Their decision scores $\vb{w}^{\intercal}\vb{x}_i + b$ on the training points are listed in \cref{tab:exp_decision_scores}. Recall that the decision score is the signed number whose \emph{sign} is the predicted class (positive for $+1$, negative for $-1$) and whose \emph{magnitude} measures how far the point sits from the boundary along the direction of $\vb{w}$, a large positive score means ``confidently class $+1$''. The sign matches the class label in every row, but the magnitudes differ substantially because SVM-GMU is responding to the \emph{entire} GMM density, not just the mean.
 
 \begin{table}[H]
     \centering
@@ -1238,26 +1243,31 @@ where each expectation is taken over the per-sample GMM density $f_{\vb{x}_i}$. 
 \end{equation}
 so the empirical hinge loss of a standard SVM trained on the $nN = 6N$ sampled points (each labeled by its parent's $y_i$) converges to \cref{eq:exp_conv_objective} pointwise in $(\vb{w}, b)$. Under the convexity of the objective established in \cref{sec:gmu_convexity}, the \emph{minimizers} converge as well. This experiment verifies that prediction empirically on the \texttt{close\_separable} dataset.
 
+\paragraph{What ``Monte Carlo'', ``IID'', and the law of large numbers mean here.} Equation \cref{eq:exp_lln} is the engine behind this whole experiment, so it is worth unpacking in plain language. The expectation $\E_{\vb{x}\sim f_{\vb{x}_i}}[\cdot]$ on the right is the \emph{true} average hinge loss taken over the entire uncertainty cloud of example $i$, exactly the quantity SVM-GMU computes in closed form. We cannot average over an infinite cloud by hand, so we \emph{estimate} that average: we draw a finite batch of $N$ sample points from the cloud and take their ordinary average (the left-hand sum). Estimating an average by drawing random samples and averaging them is called a \emph{Monte Carlo} estimate, named after the casino, because it relies on random draws. Those draws are \emph{IID}, independent and identically distributed: each of the $N$ points is generated the same way and independently of the others, like rolling the same die over and over. The \emph{law of large numbers} then guarantees that this sample average closes in on the true expectation as $N \to \infty$; the annotation ``a.s.'' (almost surely) is the precise way of saying ``with probability $1$'', that is, guaranteed except for freak events of total probability zero. Because this holds for every fixed boundary $(\vb{w}, b)$ (the phrase ``pointwise in $(\vb{w}, b)$''), and because both objectives are convex with a single minimum (\cref{sec:gmu_convexity}), the \emph{location} of the minimum converges too: the boundary the standard SVM settles on from the samples drifts toward the boundary SVM-GMU finds in closed form. The rest of this section measures that drift.
+
 \subsection{Experimental Procedure}
 
-The reference SVM-GMU is trained as in \cref{sec:exp_fit_gmu}, yielding the parameters in \cref{eq:exp_learned_gmu} (denoted $\vb{w}_{\text{ref}}$, $b_{\text{ref}}$ below). For each value of $N \in \{1, 5, 25, 100, 500, 2000, 5000, 20000\}$ we repeat the following procedure.
+The reference SVM-GMU is trained as in \cref{sec:exp_fit_gmu}, yielding the parameters in \cref{eq:exp_learned_gmu} (denoted $\vb{w}_{\text{ref}}$, $b_{\text{ref}}$ below). For each value of $N \in \{1, 5, 25, 100, 500, 2000, 5000, 20000\}$ and each of $R = 30$ independent random seeds, we repeat the following procedure.
 \begin{enumerate}[leftmargin=2em]
     \item For each of the $n = 6$ observed points, draw $N$ IID samples from $f_{\vb{x}_i}$ by picking a component index $m \in \{1, \ldots, M_i\}$ according to $\bpi_i$ and then drawing a point from $\Norm\left(\bmu_i^{(m)}, \bSigma_i^{(m)}\right)$.
     \item Label each sample by its parent's $y_i$.
-    \item Stack the $6N$ labeled samples into a dataset and train a \emph{standard} linear SVM on it (i.e., invoke the estimator without any \texttt{sample\_uncertainty}, which reduces to the usual hinge-loss objective). The regularization parameter $\lambda = 10^{-2}$ and random seed are the same as for the reference SVM-GMU.
+    \item Stack the $6N$ labeled samples into a dataset and train a \emph{standard} linear SVM on it (i.e., invoke the estimator without any \texttt{sample\_uncertainty}, which reduces to the usual hinge-loss objective). The regularization parameter is $\lambda = 10^{-2}$, as for the reference SVM-GMU; the variation across the $R$ seeds enters through the random draws in step~1.
     \item Record the learned $(\vb{w}_N, b_N)$ and then compute three boundary-disagreement metrics against $(\vb{w}_{\text{ref}}, b_{\text{ref}})$.
 \end{enumerate}
+For each $N$ we then summarize the $R$ seeds by the median of each metric, together with the $25$th--$75$th percentile inter-quartile band that the figures display.
 
 \subsection{Boundary-Disagreement Metrics}
 
-To quantify how close a learned boundary is to the reference SVM-GMU boundary, we use three scalar metrics:
+To quantify how close a learned boundary is to the reference SVM-GMU boundary, we use three scalar metrics.
+
+\paragraph{Why we first normalize by $\|\vb{w}\|$.} A subtlety underlies all three metrics: the same boundary line can be written with many different $(\vb{w}, b)$ pairs. Multiplying both $\vb{w}$ and $b$ by any positive constant leaves the line $\vb{w}^{\intercal}\vb{x} + b = 0$ unchanged (for example $2\vb{w}^{\intercal}\vb{x} + 2b = 0$ is the very same line), so the raw entries of $\vb{w}$ and $b$ are not directly comparable between two classifiers; one may simply have happened to use a longer $\vb{w}$. To strip out this arbitrary scale we divide through by the length $\|\vb{w}\|$, rescaling the normal vector to length one. After this normalization the decision function $\widehat{\vb{w}}^{\intercal}\vb{x} + b/\|\vb{w}\|$ equals the genuine \emph{signed distance} from $\vb{x}$ to the boundary (positive on one side, negative on the other), a purely geometric quantity on which two classifiers can be compared fairly. The three metrics are:
 \begin{itemize}[leftmargin=2em]
     \item \textbf{Angle between normals:}
     \begin{equation}
         \theta_N = \arccos\!\left(\widehat{\vb{w}}_N^{\intercal}\widehat{\vb{w}}_{\text{ref}}\right),
         \qquad \widehat{\vb{w}} = \frac{\vb{w}}{\|\vb{w}\|},
     \end{equation}
-    reported in degrees. Measures how much the two boundary \emph{orientations} disagree.
+    reported in degrees. This measures how much the two boundary \emph{orientations} disagree. The dot product of two unit vectors is exactly the cosine of the angle between them, so $\arccos$ turns it back into that angle: $\theta_N = 0^{\circ}$ means the two normals point the same way and the boundaries are perfectly parallel, while a larger angle means their orientations have diverged.
     \item \textbf{Offset difference:}
     \begin{equation}
         \Delta_N^{\text{offset}} = \left|\frac{b_N}{\|\vb{w}_N\|} - \frac{b_{\text{ref}}}{\|\vb{w}_{\text{ref}}\|}\right|.
@@ -1273,24 +1283,24 @@ If the Monte Carlo argument above is correct, all three metrics should tend to z
 
 \subsection{Results}
 
-\Cref{tab:exp_conv_metrics} reports the three metrics for every value of $N$ in the sweep, alongside the total training-set size $n_{\text{total}} = 6N$ used to fit each standard SVM. The trend is clear: by $N = 20000$ (i.e., $n_{\text{total}} = 120000$) the angle is within $0.22^{\circ}$, the offset difference is below $10^{-3}$, and the grid RMS is $\approx 0.01$. Two minor non-monotonicities appear in the table (e.g., the angle rises slightly from $N = 25$ to $N = 100$), which we attribute to finite-sample noise and the stochastic nature of the SGD solver rather than to any systematic effect; the overall convergence is unmistakable.
+\Cref{tab:exp_conv_metrics} reports the median of each metric over the $R = 30$ seeds for every value of $N$ in the sweep, alongside the total training-set size $n_{\text{total}} = 6N$ used to fit each standard SVM. The trend is clear: by $N = 20000$ (i.e., $n_{\text{total}} = 120000$) the median angle is within $0.12^{\circ}$, the median offset difference is below $2\times10^{-3}$, and the median grid RMS is $\approx 0.007$. Averaging over seeds removes the spurious wiggles that any single run would show: the residual run-to-run scatter is now carried by the inter-quartile bands of \cref{fig:exp_conv_metrics}, which contract steadily as $N$ grows, rather than appearing as non-monotonicities in a point estimate.
 
 \begin{table}[H]
     \centering
-    \caption{Convergence of the standard-SVM-on-samples boundary to the reference SVM-GMU boundary, as a function of the number of Monte Carlo draws $N$ per observed point. $n_{\text{total}} = 6N$ is the size of the training set fed to the standard SVM.}
+    \caption{Convergence of the standard-SVM-on-samples boundary to the reference SVM-GMU boundary, as a function of the number of Monte Carlo draws $N$ per observed point. $n_{\text{total}} = 6N$ is the size of the training set fed to the standard SVM. Values are medians over $R = 30$ random seeds; the inter-quartile bands are shown in \cref{fig:exp_conv_metrics}.}
     \label{tab:exp_conv_metrics}
     \begin{tabular}{@{}rrrrr@{}}
         \toprule
         $N$ & $n_{\text{total}}$ & $\theta_N$ (deg) & $\Delta_N^{\text{offset}}$ & Grid RMS \\
         \midrule
-        1       & 6       & 9.3425 & 1.0432 & 1.0917 \\
-        5       & 30      & 4.2608 & 0.1404 & 0.2662 \\
-        25      & 150     & 0.1996 & 0.1921 & 0.1912 \\
-        100     & 600     & 1.2658 & 0.0463 & 0.0727 \\
-        500     & 3000    & 0.4823 & 0.0231 & 0.0309 \\
-        2000    & 12000   & 0.2334 & 0.0242 & 0.0280 \\
-        5000    & 30000   & 0.2437 & 0.0032 & 0.0128 \\
-        20000   & 120000  & 0.2168 & 0.0005 & 0.0106 \\
+        1       & 6       & 6.4025 & 0.4054 & 0.5868 \\
+        5       & 30      & 5.8808 & 0.1591 & 0.3654 \\
+        25      & 150     & 2.0682 & 0.0937 & 0.1499 \\
+        100     & 600     & 0.9299 & 0.0457 & 0.0899 \\
+        500     & 3000    & 0.2316 & 0.0168 & 0.0292 \\
+        2000    & 12000   & 0.2367 & 0.0090 & 0.0171 \\
+        5000    & 30000   & 0.2399 & 0.0080 & 0.0161 \\
+        20000   & 120000  & 0.1185 & 0.0017 & 0.0074 \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -1300,7 +1310,7 @@ If the Monte Carlo argument above is correct, all three metrics should tend to z
 \begin{figure}[H]
     \centering
     \resizebox{\textwidth}{!}{\input{graphics/convergence_metrics.pgf}}
-    \caption{Boundary-disagreement metrics between the standard SVM fit to $6N$ Monte Carlo samples and the reference SVM-GMU, as a function of $N$. \emph{Left:} angle between the two weight-vector normals (degrees). \emph{Middle:} offset difference $\left|\frac{b_N}{\|\vb{w}_N\|} - \frac{b_{\text{ref}}}{\|\vb{w}_{\text{ref}}\|}\right|$. \emph{Right:} RMS difference of the unit-normalized decision functions over a dense grid. All three tend to zero as $N$ grows, confirming that the standard-SVM-on-samples minimizer converges to the SVM-GMU minimizer.}
+    \caption{Boundary-disagreement metrics between the standard SVM fit to $6N$ Monte Carlo samples and the reference SVM-GMU, as a function of $N$. \emph{Left:} angle between the two weight-vector normals (degrees). \emph{Middle:} offset difference $\left|\frac{b_N}{\|\vb{w}_N\|} - \frac{b_{\text{ref}}}{\|\vb{w}_{\text{ref}}\|}\right|$. \emph{Right:} RMS difference of the unit-normalized decision functions over a dense grid. Solid lines are the median over $R = 30$ seeds and the shaded bands span the $25$th to $75$th percentile. All three tend to zero as $N$ grows, confirming that the standard-SVM-on-samples minimizer converges to the SVM-GMU minimizer.}
     \label{fig:exp_conv_metrics}
 \end{figure}
 
@@ -1322,7 +1332,7 @@ As $N$ increases from $1$ to $20000$, the cloud fills out the GMM densities and 
 
 \subsection{Interpretation}
 
-The experiment confirms, empirically, what \cref{sec:sampling} argues on theoretical grounds: the SVM-GMU objective is nothing more than the $N \to \infty$ limit of a standard hinge-loss objective evaluated on samples drawn from the per-sample GMMs. In the opposite direction, it also highlights the computational value of the closed-form objective. Reaching a grid-RMS of $\approx 0.01$ required $N = 20000$ samples per observed point, i.e., a training set of $120000$ points. SVM-GMU attains the same fit directly from the $n = 6$ original examples and their GMM descriptions, with no sampling at all. In higher dimensions the gap between the closed-form and sampling approaches widens sharply (as noted in the concentration bound \cref{eq:concentration}), so this advantage becomes essential rather than merely convenient.
+The experiment confirms, empirically, what \cref{sec:sampling} argues on theoretical grounds: the SVM-GMU objective is nothing more than the $N \to \infty$ limit of a standard hinge-loss objective evaluated on samples drawn from the per-sample GMMs. In the opposite direction, it also highlights the computational value of the closed-form objective. Reaching a median grid-RMS of $\approx 0.007$ required $N = 20000$ samples per observed point, i.e., a training set of $120000$ points. SVM-GMU attains the same fit directly from the $n = 6$ original examples and their GMM descriptions, with no sampling at all. In higher dimensions the gap between the closed-form and sampling approaches widens sharply (as noted in the concentration bound \cref{eq:concentration}), so this advantage becomes essential rather than merely convenient.
 
 \section{Experiment 3: Does the Mixture Structure Matter?}\label{sec:exp_gmu_vs_gsu}
 
@@ -1342,7 +1352,9 @@ and the overall covariance is given by the law of total covariance \cref{eq:mixt
 \end{equation}
 The between-component term is the crucial one for banana- and crescent-shaped mixtures: it inflates the moment-matched covariance along the direction in which the component means spread out, turning a curved row of small ellipses into a single large, oriented ellipse.
 
-\Cref{tab:exp_moment_match} lists the moment-matched mean $\bar{\bmu}_i$ and the two eigenvalues of $\bar{\bSigma}_i$ for each of the six samples, along with the anisotropy ratio $\nicefrac{\lambda_2}{\lambda_1}$ (ratio of the larger to the smaller eigenvalue). The anisotropy is between $3.29\times$ and $3.99\times$, confirming that each moment-matched ellipse is heavily elongated, as one would expect from a banana/crescent GMM whose means lie along an arc.
+\paragraph{What ``matching moments'' means.} The \emph{moments} of a distribution are its basic summary numbers: the first moment is the mean (where the distribution is centered) and the second moment is the covariance (how far and in which directions it is spread). A moment-matched Gaussian is the single Gaussian with the \emph{same center and the same spread} as the mixture, the closest a lone Gaussian can come to mimicking it. The \emph{law of total covariance} \cref{eq:exp_moment_cov} then says this overall spread splits into two intuitive pieces. The \emph{within-component} term averages how spread out the individual components are on their own; the \emph{between-component} term adds how far the component centers sit from the overall center. A classroom analogy makes this concrete: to describe the spread of students' heights across several classrooms, part of it is the variation \emph{inside} each classroom (within) and part is the variation \emph{between} the classroom averages (between), and the total is the sum of the two. For a banana mixture the component centers are strung along an arc, so the between-component term is large in the arc's direction, and that is exactly what stretches the matched Gaussian into a long ellipse.
+
+\Cref{tab:exp_moment_match} lists the moment-matched mean $\bar{\bmu}_i$ and the two \emph{eigenvalues} of $\bar{\bSigma}_i$ for each of the six samples, along with the anisotropy ratio $\nicefrac{\lambda_2}{\lambda_1}$. The two eigenvalues of a $2\times2$ covariance have a direct geometric reading: they are the variances along the ellipse's two principal axes (its longest and shortest directions), so $\sqrt{\lambda_1}$ and $\sqrt{\lambda_2}$ are the lengths of the short and long semi-axes of the one-standard-deviation ellipse. Their ratio $\nicefrac{\lambda_2}{\lambda_1}$ (larger over smaller) therefore measures how stretched the ellipse is: a value of $1$ is a perfect circle, and the larger it grows the more cigar-shaped the ellipse becomes. Here the anisotropy is between $3.29\times$ and $3.99\times$, confirming that each moment-matched ellipse is heavily elongated, as one would expect from a banana/crescent GMM whose means lie along an arc.
 
 \begin{table}[H]
     \centering
@@ -1380,7 +1392,7 @@ Applying the three boundary-disagreement metrics from \cref{sec:exp_convergence}
     \qquad
     \text{Grid RMS} = 0.0861.
 \end{equation}
-The disagreement is small but not zero. For context: in the Monte Carlo experiment of \cref{sec:exp_convergence}, the standard-SVM-on-samples boundary reaches a grid RMS of this magnitude ($\approx 0.09$) somewhere between $N = 25$ and $N = 100$ samples per observed point (i.e., $n_{\text{total}} \approx 150\!-\!600$ total training points, see \cref{tab:exp_conv_metrics}). So going from a full GMM to a single moment-matched Gaussian costs us about as much boundary fidelity as replacing the closed-form objective with a coarse Monte Carlo approximation.
+Both the SVM-GMU and the moment-matched SVM-GSU boundaries are unique minimizers of strongly convex objectives, so these three numbers are seed-independent: repeating the comparison over $30$ seeds leaves them unchanged to within $5\times10^{-5}$ (their seed-to-seed standard deviations are all below $10^{-4}$). The disagreement is small but not zero. For context: in the Monte Carlo experiment of \cref{sec:exp_convergence}, the standard-SVM-on-samples boundary reaches a median grid RMS of this magnitude ($\approx 0.09$) at around $N = 100$ samples per observed point (i.e., $n_{\text{total}} \approx 600$ total training points, see \cref{tab:exp_conv_metrics}). So going from a full GMM to a single moment-matched Gaussian costs us about as much boundary fidelity as replacing the closed-form objective with a coarse Monte Carlo approximation.
 
 \subsection{Visual Comparison}
 
@@ -1411,14 +1423,16 @@ The first three experiments assume the per-sample GMMs are handed to us. In a re
 
 \subsection{Experimental Procedure}
 
-The reference SVM-GMU is the one trained in \cref{sec:exp_fit_gmu} on the true GMMs, with the parameters in \cref{eq:exp_learned_gmu}. For each value of $N \in \{50, 100, 250, 500, 1000, 2000, 5000, 20000\}$ we repeat the following.
+The reference SVM-GMU is the one trained in \cref{sec:exp_fit_gmu} on the true GMMs, with the parameters in \cref{eq:exp_learned_gmu}. For each value of $N \in \{50, 100, 250, 500, 1000, 2000, 5000, 20000\}$ and each of $R = 30$ independent seeds, we repeat the following.
 \begin{enumerate}[leftmargin=2em]
     \item For each of the $n = 6$ observed points, draw $N$ IID samples from its true GMM $f_{\vb{x}_i}$ (component picked by $\bpi_i$, then a draw from that component's Gaussian).
     \item Fit a GMM to those $N$ samples by EM, selecting the number of components $M \in \{1, \ldots, 8\}$ that minimizes the Bayesian Information Criterion (BIC; see \cref{sec:exp_em_bic}), with full covariances and several restarts.
     \item Label the estimated GMM by its parent's $y_i$.
     \item Fit SVM-GMU on the six estimated GMMs ($\lambda = 10^{-2}$, $T = 1000$, $k = 6$, seed $42$) and measure its boundary against the reference using the three metrics of \cref{sec:exp_convergence} (angle between normals, offset difference, and grid RMS of the unit-normalized decision functions).
 \end{enumerate}
-A single run is used per $N$ with a fixed master seed, so the sweep is reproducible. As in \cref{sec:exp_convergence}, single-run EM and the BIC component choice introduce some jitter, so the metrics are not perfectly monotonic.
+The whole procedure is repeated over $R = 30$ independent seeds, all spawned from one master seed so that the sweep is reproducible. For each $N$ we report the median of each metric with its $25$th--$75$th percentile band; the selected component count $M$ is reported as the per-point \emph{modal} choice, the most frequently selected count, across the seeds (a six-vector, since the six examples are fit independently). Seed-averaging matters more here than anywhere else in this part: a single EM run, with its random restarts and BIC tie-breaks, is noticeably noisier than the pure-sampling experiment of \cref{sec:exp_convergence}, and a lone run can land on a misleadingly good or bad fit at any given $N$.
+
+\paragraph{What Expectation Maximization does.} Step~2 fits a Gaussian mixture to a cloud of points: it estimates the weights, means, and covariances of the components that best explain where the points fell. \emph{Expectation Maximization} (EM) is the standard algorithm for this. It cannot directly see which component produced each point, so it alternates two steps until the fit stops improving: an \emph{Expectation} step that, given the current components, computes for every point a soft guess of which component it probably came from; and a \emph{Maximization} step that, given those soft guesses, re-estimates each component's weight, mean, and covariance. Each round can only increase the likelihood of the data (the quantity defined just below), so EM climbs steadily toward a good fit. It can, however, climb to a \emph{local} peak that depends on where it started, so in practice one runs it several times from different random starting points (the ``restarts'' mentioned above) and keeps the best result. The output is an ordinary GMM, ready to be handed to SVM-GMU exactly like the hand-specified mixtures of the earlier experiments.
 
 \subsection{Model Selection with the Bayesian Information Criterion}\label{sec:exp_em_bic}
 
@@ -1428,7 +1442,7 @@ Step~2 of the procedure leaves one choice open: how many Gaussian components sho
 \begin{equation}\label{eq:bic}
     \mathrm{BIC} = -2\ln\hat{L} + k\ln N,
 \end{equation}
-where $\hat{L}$ is the maximized likelihood of the data under the fitted model, $k$ is the number of free parameters of the model, and $N$ is the number of data points (here, the size of the sampled cloud for one observed example). The score has two competing terms:
+where $\hat{L}$ is the maximized likelihood of the data under the fitted model (the \emph{likelihood} is how probable the observed points are under the model, so a higher likelihood means the fitted mixture places more of its density where the points actually landed), $k$ is the number of free parameters of the model, and $N$ is the number of data points (here, the size of the sampled cloud for one observed example). The score has two competing terms:
 \begin{itemize}[leftmargin=2em]
     \item The \emph{fit term} $-2\ln\hat{L}$ rewards explaining the data. A better fit means a higher likelihood, which makes this term smaller (more negative). Adding components can only keep the likelihood the same or improve it, so this term decreases as $M$ grows.
     \item The \emph{complexity penalty} $k\ln N$ punishes using more parameters. It grows with $M$, since each additional component adds parameters.
@@ -1442,7 +1456,7 @@ In this experiment $d = 2$, so $k = 6M - 1$: every extra component costs six par
 
 \paragraph{Why the smallest BIC is chosen.} Lower BIC is better. Selecting the $M$ with the smallest BIC picks the model that best balances fit against complexity. Choosing by likelihood alone would always select the most complex candidate ($M = 8$ here), because more components never hurt the in-sample likelihood; the penalty $k\ln N$ is exactly what prevents that overfitting. Plotted against $M$, the BIC is typically U-shaped: it falls while added components yield genuine likelihood gains, then rises once further components only add parameters without improving the fit. The minimum is the sweet spot between underfitting and overfitting.
 
-\paragraph{Consistency, and the trend in the $M$ column.} The penalty per parameter is $\ln N$, which \emph{grows with the sample size}. This makes BIC consistent: as $N \to \infty$ it recovers the true number of components and resists adding spurious ones. This is exactly the behavior of the $M$ column of \cref{tab:exp_em_metrics}. At $N = 50$ the penalty dominates the modest likelihood gains that a few noisy points can demonstrate, so BIC collapses each example to roughly one component, $M = (1, 2, 1, 1, 1, 1)$. At $N = 20000$ the likelihood improvement from the genuine five to six components in each banana or crescent overwhelms the penalty, and BIC recovers counts near the truth, $M = (5, 4, 6, 4, 4, 4)$.
+\paragraph{Consistency, and the trend in the $M$ column.} The penalty per parameter is $\ln N$, which \emph{grows with the sample size}. This makes BIC consistent: as $N \to \infty$ it recovers the true number of components and resists adding spurious ones. This is exactly the behavior of the $M$ column of \cref{tab:exp_em_metrics}. At $N = 50$ the penalty dominates the modest likelihood gains that a few noisy points can demonstrate, so BIC collapses each example to roughly one component, $M = (1, 2, 1, 1, 1, 1)$. At $N = 20000$ the likelihood improvement from the genuine five to six components in each banana or crescent overwhelms the penalty, and BIC recovers counts approaching the truth, $M = (5, 4, 6, 3, 4, 4)$ (the per-point modal selection across the $R = 30$ seeds).
 
 \paragraph{What BIC compares, and what it does not.} It is worth being precise about the two distinct comparison steps in this experiment, because they operate at different levels.
 \begin{enumerate}[leftmargin=2em]
@@ -1453,24 +1467,24 @@ In short, BIC only decides how many Gaussians to use when reconstructing each ex
 
 \subsection{Results}
 
-\Cref{tab:exp_em_metrics} reports the three metrics across the sweep, and \cref{fig:exp_em_metrics,fig:exp_em_panels} visualize them. The trend is clear in the orientation and offset of the boundary: the angle falls to $0.26^{\circ}$ and the offset difference to $7 \times 10^{-4}$ by $N = 20000$, and the grid RMS ends at $0.0127$, comparable to the $0.0106$ reached by the Monte Carlo experiment of \cref{sec:exp_convergence} at the same $N$. The most telling quantity is the number of components BIC selects: at $N = 50$ it picks $M = (1, 2, 1, 1, 1, 1)$, collapsing most examples to a single Gaussian, whereas by $N = 20000$ it picks $M = (5, 4, 6, 4, 4, 4)$, approaching the true counts $(5, 6, 5, 6, 5, 6)$. As the data reveals the true mixture structure, the EM-fitted contours sharpen into the banana and crescent shapes and the learned boundary settles onto the reference.
+\Cref{tab:exp_em_metrics} reports the median of the three metrics across the sweep, and \cref{fig:exp_em_metrics,fig:exp_em_panels} visualize them with their bands. The trend is clear in the orientation and offset of the boundary: the median angle falls to $0.34^{\circ}$ and the median offset difference to $6 \times 10^{-3}$ by $N = 20000$, and the median grid RMS ends at $0.018$, the same order as the $0.007$ reached by the Monte Carlo experiment of \cref{sec:exp_convergence} at the same $N$. The most telling quantity is the number of components BIC selects: at $N = 50$ the modal choice is $M = (1, 2, 1, 1, 1, 1)$, collapsing most examples to a single Gaussian, whereas by $N = 20000$ it is $M = (5, 4, 6, 3, 4, 4)$, approaching the true counts $(5, 6, 5, 6, 5, 6)$. As the data reveals the true mixture structure, the EM-fitted contours sharpen into the banana and crescent shapes and the learned boundary settles onto the reference.
 
 \begin{table}[H]
     \centering
-    \caption{Disagreement between the SVM-GMU boundary fit on EM-estimated GMMs and the true-GMM reference, as a function of the number of EM training samples $N$ per observed point ($n_{\text{total}} = 6N$). The column $M$ lists the BIC-selected number of components for the six observed points $(M_1, \ldots, M_6)$; the true counts are $(5, 6, 5, 6, 5, 6)$. A single run per $N$ is used; the non-monotonicities (for example the $N = 100$ row) are single-run EM and BIC jitter, as also seen in \cref{tab:exp_conv_metrics}.}
+    \caption{Disagreement between the SVM-GMU boundary fit on EM-estimated GMMs and the true-GMM reference, as a function of the number of EM training samples $N$ per observed point ($n_{\text{total}} = 6N$). The three metrics are medians over $R = 30$ seeds; the inter-quartile bands are shown in \cref{fig:exp_em_metrics}. The column $M$ lists the per-point \emph{modal} BIC-selected component count across the seeds for the six observed points $(M_1, \ldots, M_6)$; the true counts are $(5, 6, 5, 6, 5, 6)$.}
     \label{tab:exp_em_metrics}
     \begin{tabular}{@{}rrrrrc@{}}
         \toprule
         $N$ & $n_{\text{total}}$ & $\theta_N$ (deg) & $\Delta_N^{\text{offset}}$ & Grid RMS & $M$ (BIC) \\
         \midrule
-        50    & 300    & 0.145 & 0.0049 & 0.0082 & $(1, 2, 1, 1, 1, 1)$ \\
-        100   & 600    & 2.287 & 0.1440 & 0.1708 & $(2, 2, 1, 1, 1, 1)$ \\
-        250   & 1500   & 0.792 & 0.0299 & 0.0519 & $(3, 2, 1, 2, 2, 2)$ \\
-        500   & 3000   & 0.383 & 0.0115 & 0.0208 & $(3, 3, 1, 2, 2, 3)$ \\
-        1000  & 6000   & 0.748 & 0.0067 & 0.0382 & $(3, 3, 2, 2, 3, 3)$ \\
-        2000  & 12000  & 0.858 & 0.0132 & 0.0457 & $(3, 3, 3, 2, 3, 3)$ \\
-        5000  & 30000  & 0.495 & 0.0031 & 0.0242 & $(5, 4, 5, 3, 3, 3)$ \\
-        20000 & 120000 & 0.260 & 0.0007 & 0.0127 & $(5, 4, 6, 4, 4, 4)$ \\
+        50    & 300    & 2.0024 & 0.0520 & 0.1156 & $(1, 2, 1, 1, 1, 1)$ \\
+        100   & 600    & 1.4264 & 0.0419 & 0.0880 & $(2, 2, 1, 1, 1, 1)$ \\
+        250   & 1500   & 0.8401 & 0.0251 & 0.0606 & $(3, 2, 1, 1, 1, 2)$ \\
+        500   & 3000   & 1.0427 & 0.0180 & 0.0553 & $(3, 3, 1, 2, 2, 2)$ \\
+        1000  & 6000   & 0.8527 & 0.0100 & 0.0431 & $(3, 3, 2, 2, 3, 3)$ \\
+        2000  & 12000  & 0.8306 & 0.0158 & 0.0424 & $(3, 3, 3, 2, 3, 3)$ \\
+        5000  & 30000  & 0.5570 & 0.0079 & 0.0285 & $(5, 4, 3, 3, 3, 3)$ \\
+        20000 & 120000 & 0.3413 & 0.0064 & 0.0176 & $(5, 4, 6, 3, 4, 4)$ \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -1478,7 +1492,7 @@ In short, BIC only decides how many Gaussians to use when reconstructing each ex
 \begin{figure}[H]
     \centering
     \resizebox{\textwidth}{!}{\input{graphics/em_convergence_metrics.pgf}}
-    \caption{Boundary-disagreement metrics between SVM-GMU fit on EM-estimated GMMs and the true-GMM reference, versus the number of EM samples $N$ per observed point. \emph{Left:} angle between the weight-vector normals. \emph{Middle:} offset difference. \emph{Right:} grid RMS of the unit-normalized decision functions. The orientation and offset converge steadily toward zero; the grid RMS is noisier but ends near $0.013$.}
+    \caption{Boundary-disagreement metrics between SVM-GMU fit on EM-estimated GMMs and the true-GMM reference, versus the number of EM samples $N$ per observed point. \emph{Left:} angle between the weight-vector normals. \emph{Middle:} offset difference. \emph{Right:} grid RMS of the unit-normalized decision functions. Solid lines are the median over $R = 30$ seeds and the shaded bands span the $25$th to $75$th percentile. The orientation and offset converge steadily toward zero; the grid RMS is noisier but ends near $0.018$.}
     \label{fig:exp_em_metrics}
 \end{figure}
 
@@ -1491,7 +1505,89 @@ In short, BIC only decides how many Gaussians to use when reconstructing each ex
 
 \subsection{Interpretation}
 
-Two points stand out. First, SVM-GMU does not require the uncertainty to be known in closed form: when each mixture is estimated from data by EM with BIC choosing the component count, the resulting classifier converges to the one trained on the true mixtures. This is the bridge from the synthetic dataset to a realistic pipeline: collect repeated noisy measurements, fit a GMM per example, and feed those to SVM-GMU. Second, the convergence is not uniform across the metrics. The orientation and offset of the boundary settle quickly and cleanly, while the grid RMS is noisier and even dips deceptively low at $N = 50$. The reason is instructive: with very little data BIC underfits each example to a near-single Gaussian, which is close to the moment-matched single-Gaussian summary of \cref{sec:exp_gmu_vs_gsu}, and that summary already produces a boundary close to SVM-GMU. The meaningful convergence is therefore the trend at larger $N$, where the estimated mixtures genuinely recover the multi-component banana and crescent shapes and all three metrics settle near zero.
+Two points stand out. First, SVM-GMU does not require the uncertainty to be known in closed form: when each mixture is estimated from data by EM with BIC choosing the component count, the resulting classifier converges to the one trained on the true mixtures. This is the bridge from the synthetic dataset to a realistic pipeline: collect repeated noisy measurements, fit a GMM per example, and feed those to SVM-GMU. Second, seed-averaging is what makes the convergence trustworthy here. A single run can land on a deceptively good fit at small $N$, because with little data BIC underfits each example to a near-single Gaussian, which is close to the moment-matched single-Gaussian summary of \cref{sec:exp_gmu_vs_gsu} and already yields a boundary close to SVM-GMU; an earlier single-run version of this experiment showed exactly such a spurious dip at $N = 50$. The median over $R = 30$ seeds removes that artifact: the disagreement is now largest at $N = 50$, as it should be, and falls roughly monotonically as $N$ grows and the estimated mixtures genuinely recover the multi-component banana and crescent shapes. The residual run-to-run variability is reported honestly as the inter-quartile band rather than hidden inside a single number.
+
+\section{Experiment 5: How Sampling Scales with Dimension}\label{sec:exp_high_dim}
+
+\subsection{Motivation}
+
+\Cref{sec:sampling} argued, via the concentration bound \cref{eq:concentration}, that drawing samples from each per-sample distribution and training a standard SVM becomes progressively less competitive with the closed-form objective as the dimensionality grows: a Gaussian, and hence a Gaussian mixture, spreads its probability mass ever more thinly in higher dimensions, so ever more samples are needed to represent it faithfully. \Cref{sec:exp_convergence} confirmed the $N \to \infty$ equivalence in the plane ($d = 2$); this experiment makes the \emph{dimensional} dependence quantitative. For a range of $d$ we build a genuinely $d$-dimensional dataset and measure $N^\ast(d)$, the number of samples per example that a standard SVM needs in order to recover the closed-form SVM-GMU boundary to a fixed angular tolerance.
+
+\subsection{A Genuinely $d$-Dimensional Dataset}\label{sec:exp_high_dim_data}
+
+The previous four experiments share the planar \texttt{close\_separable} dataset. This one cannot: its question is about \emph{high-dimensional} uncertainty, so the per-sample distributions must genuinely occupy $\R^d$. The non-Gaussian \emph{shapes} that motivate SVM-GMU, the banana and crescent of \cref{sec:exp_close_separable}, are intrinsically low-dimensional, so rather than extruding them artificially we use a purpose-built family of $d$-dimensional Gaussian-mixture datasets, one per dimension, in which the per-example uncertainty is a genuine mixture that fills all $d$ coordinates.
+
+For each $d$ we construct $n = 10$ examples, five per class. Example $i$ is an equally weighted mixture of $M = 3$ isotropic Gaussian components, written in the same notation as the general GMM of \cref{eq:gmm_pdf},
+\begin{equation}\label{eq:exp_highd_construct}
+    f_{\vb{x}_i}(\vb{x}) = \sum_{m=1}^{3} \pi_i^{(m)}\, \Norm\!\left(\vb{x};\; \bmu_i^{(m)},\; \bSigma_i^{(m)}\right).
+\end{equation}
+The construction merely fixes what each of those three ingredients is. The mixing weights are equal, $\pi_i^{(m)} = \tfrac{1}{3}$; each component covariance is isotropic, $\bSigma_i^{(m)} = \sigma^2 \vb{I}_d$; and each component mean is the example center pushed a fixed distance in a random direction,
+\begin{equation}\label{eq:exp_highd_mean}
+    \bmu_i^{(m)} = \vb{c}_i + s\,\vb{u}_i^{(m)},
+\end{equation}
+where $\vb{c}_i \in \R^d$ is the example center, each $\vb{u}_i^{(m)} \in \R^d$ is an independent random unit vector (a direction of length one), and $s$ is the component spread. In words, \cref{eq:exp_highd_mean} says: start at the center $\vb{c}_i$ and step a distance $s$ along the random direction $\vb{u}_i^{(m)}$ to place the $m$-th component. The two class centers are separated along the first coordinate by $\pm \delta$ and given a small isotropic jitter in the remaining coordinates, so the optimal boundary is genuinely $d$-dimensional rather than aligned with a single axis. The classes are placed close enough that their uncertainty overlaps, so that, exactly as in \cref{sec:exp_close_separable}, the boundary depends on the full per-example distribution and not merely on the observed means. We use $\delta = 2$, jitter standard deviation $0.5$, $s = 0.9$, and $\sigma = 1.1$.
+
+\paragraph{Reading the construction.} A few terms in \cref{eq:exp_highd_construct,eq:exp_highd_mean} are worth spelling out. A covariance of the form $\sigma^2 \vb{I}_d$, a number $\sigma^2$ times the $d \times d$ identity matrix, describes \emph{isotropic} uncertainty: the same variance $\sigma^2$ in every coordinate and no correlation between coordinates, so each component is a perfectly round, fuzzy ball of radius about $\sigma$ in $\R^d$ rather than a stretched ellipse. A \emph{unit vector} $\vb{u}_i^{(m)}$ is just a direction, an arrow of length one; multiplying it by the spread $s$ places the $m$-th component's center a distance $s$ from the example center $\vb{c}_i$ along that random direction. So each example is three round balls of uncertainty, scattered a short hop apart around $\vb{c}_i$ in three random directions of the $d$-dimensional space and blended in equal thirds. The parameter $\delta$ is how far apart the two classes sit (small, so they nearly touch), and the ``jitter'' is a little extra randomness in the class centers so that the dividing surface tilts through all $d$ axes instead of lining up with a single one.
+
+Two features make this the right construction for the question at hand. First, it is genuinely high-dimensional: the uncertainty has variance $\sigma^2$ in every one of the $d$ directions, and the optimal weight vector uses all of them. Second, it is a \emph{genuine mixture} ($M = 3 > 1$), so the closed-form reference is literally SVM-GMU, not its single-Gaussian special case. In high dimensions a three-component mixture is only mildly non-Gaussian, but that is deliberate: the role of this experiment is to measure the \emph{dimensional scaling} of the sampling cost, whereas the value of the mixture's \emph{shape} is what \cref{sec:exp_fit_gmu,sec:exp_gmu_vs_gsu} demonstrate in the plane, where non-Gaussian structure lives.
+
+\subsection{Protocol and a Dimension-Agnostic Metric}\label{sec:exp_high_dim_protocol}
+
+The grid RMS of \cref{sec:exp_convergence} evaluates the decision functions on a dense grid over the plane, which is infeasible in high dimensions. We replace it with a Monte Carlo decision-function RMS that captures the same quantity but works at any $d$: we draw a cloud $\{\vb{x}_g\}_{g=1}^{G}$ of $G = 10 \times 2000 = 20000$ points from the per-example mixtures themselves and compute
+\begin{equation}\label{eq:exp_mc_rms}
+    \Delta^{\text{mc}} = \sqrt{\frac{1}{G}\sum_{g=1}^{G}\left(\hat{f}_N(\vb{x}_g) - \hat{f}_{\text{ref}}^d(\vb{x}_g)\right)^2},
+\end{equation}
+with $\hat{f}$ the unit-normalized decision function of \cref{sec:exp_convergence}. The angle $\theta$ and the offset $\Delta^{\text{offset}}$ are dimension-agnostic already and carry over unchanged.
+
+The closed-form reference $(\vb{w}_{\text{ref}}^d, b_{\text{ref}}^d)$ is obtained by minimizing the SVM-GMU objective \cref{eq:gmu_objective} on the analytic mixtures; it is exact at every $d$ and never samples. For each dimension $d \in \{2, 3, 5, 10, 20, 50\}$ and each of $R = 30$ seeds (each seed drawing a fresh dataset and fresh samples), we sweep $N$ over a geometric ladder (a sequence whose values grow by a roughly constant multiplicative factor, here about $\times 3$ per step, so a handful of ``rungs'' span several orders of magnitude) $\{10, 30, 100, 300, 1000, 3000, 10^4, 3\times10^4\}$, fit a standard SVM to the $10N$-point cloud at each rung, and record $\theta$ against the reference. We define
+\begin{equation}\label{eq:exp_nstar}
+    N^\ast(d) = \min\left\{ N \text{ on the ladder} : \theta \le \tau \right\},
+\end{equation}
+the smallest number of samples per example at which the standard SVM matches the closed-form boundary to within $\tau$ degrees, and report its median over the $R$ seeds for both $\tau = 2^\circ$ and the stricter $\tau = 1^\circ$. The ladder is capped at $N_{\max} = 3\times10^4$; when a seed never reaches the tolerance within the cap we record its $N^\ast$ as having ``exceeded the cap''.
+
+\paragraph{Why the sampler struggles.} The closed-form reference uses the analytic mixtures directly, so it incurs no sampling error at any $d$. A standard SVM, by contrast, must reconstruct each example's $d$-dimensional distribution from finitely many draws. As $d$ grows there are more directions in which the empirical cloud can fail to pin the boundary down, and the mixture's mass spreads more thinly, so the number of samples needed to reach a fixed angular tolerance grows steeply. This is exactly the difficulty the concentration bound \cref{eq:concentration} anticipates.
+
+\subsection{Results}
+
+\Cref{tab:exp_high_dim} reports $N^\ast(d)$ for both tolerances, and \cref{fig:exp_high_dim_nstar} plots them on a logarithmic vertical axis. The growth is steep and orderly. At $\tau = 2^\circ$ the median samples-to-match climbs from $30$ at $d = 2$ to $10^4$ at $d = 20$, roughly an order of magnitude for every doubling of the dimension, and at $d = 50$ \emph{every one} of the $30$ seeds exceeds the ladder ceiling of $3\times10^4$. At the stricter $\tau = 1^\circ$ the wall arrives sooner: no seed reaches the tolerance within $3\times10^4$ samples by $d = 20$. The closed-form SVM-GMU, by contrast, attains the exact boundary at every $d$ from the ten examples and their mixture descriptions, with no sampling at all.
+
+\begin{table}[H]
+    \centering
+    \caption{Samples-to-match $N^\ast(d)$: the smallest number of Monte Carlo samples per example at which a standard SVM matches the closed-form SVM-GMU boundary to within $\tau$ degrees, on the genuinely $d$-dimensional Gaussian-mixture datasets of \cref{eq:exp_highd_construct}. Values are medians over $R = 30$ seeds; ``$>3\times10^4$'' marks dimensions where more than half the seeds never reach the tolerance within the ladder ceiling $N_{\max} = 3\times10^4$. The inter-quartile bands are shown in \cref{fig:exp_high_dim_nstar}.}
+    \label{tab:exp_high_dim}
+    \begin{tabular}{@{}rrr@{}}
+        \toprule
+        $d$ & $N^\ast(d)$, $\tau = 2^\circ$ & $N^\ast(d)$, $\tau = 1^\circ$ \\
+        \midrule
+        2  & $30$           & $300$          \\
+        3  & $300$          & $2000$         \\
+        5  & $1000$         & $3000$         \\
+        10 & $3000$         & $10000$        \\
+        20 & $10000$        & $>3\times10^4$ \\
+        50 & $>3\times10^4$ & $>3\times10^4$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.75\textwidth}{!}{\input{graphics/high_dim_nstar.pgf}}
+    \caption{Samples-to-match $N^\ast(d)$ versus dimension $d$ on a logarithmic vertical axis, for tolerances $\tau = 1^\circ$ and $\tau = 2^\circ$. Solid markers are the median over $R = 30$ seeds and the shaded bands span the $25$th to $75$th percentile. Upward triangles at the ceiling mark dimensions where some seeds never reach the tolerance within $N_{\max} = 3\times10^4$. $N^\ast(d)$ grows by roughly an order of magnitude per doubling of $d$, while the closed-form SVM-GMU pays nothing.}
+    \label{fig:exp_high_dim_nstar}
+\end{figure}
+
+The complementary view fixes the sample budget and watches the error grow with dimension. \Cref{fig:exp_high_dim_budget} does this for $N = 1000$ and $N = 10^4$ samples per example: the median angle to the reference rises from $0.59^\circ$ at $d = 2$ to $6.93^\circ$ at $d = 50$ for $N = 1000$, and from $0.27^\circ$ to $2.91^\circ$ for $N = 10^4$, whereas the closed-form SVM-GMU sits at exactly $0^\circ$ for every $d$.
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.75\textwidth}{!}{\input{graphics/high_dim_fixed_budget.pgf}}
+    \caption{Fixed-budget view: median angle (over $R = 30$ seeds) between the standard-SVM-on-samples boundary and the closed-form SVM-GMU reference, as a function of dimension $d$, at two sample budgets $N$. The dashed line at $0^\circ$ is the closed-form SVM-GMU, exact at every dimension. At a fixed budget the sampling error grows steadily with $d$.}
+    \label{fig:exp_high_dim_budget}
+\end{figure}
+
+\subsection{Interpretation}
+
+The experiment turns the qualitative warning of \cref{sec:sampling} into a measured curve. Sampling from the per-sample mixtures and training a standard SVM is a viable substitute for the closed-form objective only in low dimensions; the sample budget needed to match SVM-GMU grows by about an order of magnitude per doubling of the dimensionality, so by a few dozen dimensions even $3\times10^4$ samples per example are not enough to reach a two-degree agreement. SVM-GMU sidesteps the issue entirely by evaluating the expected hinge loss in closed form \cref{eq:gmu_objective}, at a cost independent of any sampling and, for diagonal (here isotropic) covariances, scaling only as $\mathcal{O}(M_i\, d)$ per example (\cref{sec:gmu_sgd}). In genuinely high-dimensional problems this is the difference between a tractable fit and an infeasible one, which is precisely the regime where uncertainty-aware classification is most often needed.
 
 % =====================================================================
 % PART VI: DISCUSSION

@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from sklearn.decomposition import PCA
 
 _EXP_DIR = Path(__file__).resolve().parents[1] / "experiments"
 sys.path.insert(0, str(_EXP_DIR))
@@ -59,3 +60,17 @@ def test_iso_gaussian_is_isotropic():
     g = RW.iso_gaussian(cloud)
     assert g["covariances"].shape == (1, 2)
     assert np.allclose(g["covariances"][0], [2.0, 2.0])  # mean of per-dim var (4, 0)
+
+
+def test_structural_components_shapes():
+    rng = np.random.default_rng(0)
+    img = np.zeros(784)
+    img[300:316] = 1.0
+    pool = RW.augmentation_cloud(img, 60, rng, rot_range=20.0, max_shift=0.0)
+    pca = PCA(n_components=3, random_state=0).fit(pool)
+    su = RW.structural_components(
+        img, k=4, rot_range=20.0, n_per_anchor=20, rng=rng, max_shift=0.0, pca=pca, cov_type="diag"
+    )
+    assert su["weights"].shape == (4,) and np.isclose(su["weights"].sum(), 1.0)
+    assert su["means"].shape == (4, 3)
+    assert su["covariances"].shape == (4, 3)

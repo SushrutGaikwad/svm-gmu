@@ -61,6 +61,34 @@ def augment_image(
     return out.astype(np.float64)
 
 
+def structural_components(
+    img_flat: NDArray[np.floating],
+    k: int,
+    rot_range: float,
+    n_per_anchor: int,
+    rng: np.random.Generator,
+    max_shift: float,
+    pca,
+    cov_type: str = "diag",
+) -> dict:
+    """EM-free K-component mixture along the known rotation arc, in PCA space."""
+    img28 = np.asarray(img_flat, dtype=np.float64).reshape(28, 28)
+    angles = np.linspace(-rot_range, rot_range, k)
+    means, covs = [], []
+    for ang in angles:
+        batch = np.array(
+            [augment_image(img28, rng, float(ang), max_shift).ravel() for _ in range(n_per_anchor)]
+        )
+        comp = moment_gaussian(pca.transform(batch), cov_type)
+        means.append(comp["means"][0])
+        covs.append(comp["covariances"][0])
+    return {
+        "weights": np.full(k, 1.0 / k),
+        "means": np.array(means),
+        "covariances": np.array(covs),
+    }
+
+
 def augmentation_cloud(
     img_flat: NDArray[np.floating],
     n_aug: int,

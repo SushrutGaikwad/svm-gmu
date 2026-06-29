@@ -56,6 +56,7 @@ tests under `../tests/`). It holds:
 | `gmu_vs_gsu_approximation.ipynb` | Exp 3: does the mixture matter | `gmu_vs_gsu_approximation.pgf` | none | seconds |
 | `em_fitted_gmu.ipynb` | Exp 4: learn uncertainty by EM | `em_convergence_metrics.pgf`, `em_fitted_gmu_convergence.pgf` | `.cache/em_full.pkl` | ~28 min |
 | `high_dim_scaling.ipynb` | Exp 5: scaling with dimension | `high_dim_nstar.pgf`, `high_dim_fixed_budget.pgf` | `.cache/high_dim_gmm_full.npz` | minutes |
+| `realworld_mnist.ipynb` | Exp A: real-data SVM-GMU vs SVM-GSU on MNIST | `realworld_mnist_rotation.pgf`, `realworld_mnist_trainsize.pgf`, `realworld_mnist_panel.pgf` | `.cache/realworld_mnist.pkl` | hours (30-seed) |
 
 ### Exp 1 - `svm_gmu_fit.ipynb`
 
@@ -94,11 +95,51 @@ Builds a genuinely d-dimensional Gaussian-mixture dataset for each
 standard SVM needs to match the closed-form SVM-GMU boundary to a fixed angular
 tolerance, plus a fixed-budget angle-versus-`d` view.
 
+### Exp A - `realworld_mnist.ipynb`
+
+Experiment A benchmarks the model ladder B0/B1/M0/M1/M2 on real MNIST data
+(digits 4 vs 9), replacing the synthetic close-separable toy problem with a
+genuine 28x28 image classification task. Augmentation clouds are built by
+random rotation (+/-`R` degrees) and small pixel shifts, then projected to a
+20-dimensional PCA subspace before fitting the SVM variants.
+
+**Baseline ladder:**
+
+- **B0** (LSVM point): standard linear SVM; no uncertainty.
+- **B1** (LSVM-iso): isotropic diagonal GSU from the augmentation cloud.
+- **M0** (SVM-GSU): diagonal moment-matched single Gaussian per sample.
+- **M1** (SVM-GMU structural): `k=5` arc-anchor component mixture from
+  the known rotation geometry.
+- **M2** (SVM-GMU EM): free diagonal GMM fitted by EM with BIC component
+  selection.
+
+**Metrics:** accuracy, macro-F1, ROC-AUC, and average precision, reported
+as 30-seed median with IQR bands.
+
+**Significance:** GMU (M2) vs GSU (M0) at the fixed operating point
+(R=45 deg, 100 training images/class) is tested by paired Wilcoxon
+signed-rank, paired t-test over per-seed accuracies, and median McNemar
+p-value.
+
+**Sweeps:**
+
+- *Rotation sweep*: `rot_ladder = [0, 15, 30, 45, 60]` degrees at fixed
+  100 training images/class; saved as `realworld_mnist_rotation.pgf`.
+- *Training-size sweep*: `train_ladder = [25, 50, 100, 250, 500]` images
+  per class at fixed R=45 deg; saved as `realworld_mnist_trainsize.pgf`.
+- *2D panel*: PCA-2 projection of augmentation clouds with fitted SVM
+  boundaries overlaid; saved as `realworld_mnist_panel.pgf`.
+
+**Cache:** `.cache/realworld_mnist.pkl` (git-ignored). First run is
+several hours (30 seeds x 11 operating points x 5 models x 5-fold CV).
+Subsequent runs load from cache and are instant. Set `FORCE_RECOMPUTE = True`
+to recompute.
+
 ## Caching and reproducibility
 
-The multi-seed experiments (2, 4, 5) run the full 30-seed sweeps and cache the
-aggregated result to `.cache/` (git-ignored). The first run is slow; subsequent
-runs load the cache and are instant. Each cached notebook has a
+The multi-seed experiments (2, 4, 5, A) run the full 30-seed sweeps and cache
+the aggregated result to `.cache/` (git-ignored). The first run is slow;
+subsequent runs load the cache and are instant. Each cached notebook has a
 `FORCE_RECOMPUTE` flag near the top: set it to `True` to recompute and overwrite
 the cache. All seeds are spawned from `MASTER_SEED = 2026`, so the regenerated
 numbers reproduce the report's tables exactly.

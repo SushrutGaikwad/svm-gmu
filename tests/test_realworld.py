@@ -113,3 +113,13 @@ def test_paired_seed_tests_detects_difference():
     r = RW.paired_seed_tests(a, b)
     assert r["wilcoxon_p"] < 0.1
     assert r["ttest_p"] < 0.05
+
+
+def test_select_lambda_returns_grid_value():
+    rng = np.random.default_rng(0)
+    X = np.vstack([rng.normal(2, 0.5, (20, 2)), rng.normal(-2, 0.5, (20, 2))])
+    y = np.array([1.0] * 20 + [-1.0] * 20)
+    grid = [1e-3, 1e-2, 1e-1]
+    lam = RW.select_lambda_cv(X, y, None, grid, n_folds=3, seed=0,
+                              svm_kwargs=dict(max_iter=500, batch_size=16))
+    assert lam in grid

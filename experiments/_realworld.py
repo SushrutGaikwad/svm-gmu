@@ -12,10 +12,14 @@ from scipy import ndimage
 from scipy.stats import binomtest, ttest_rel, wilcoxon
 from sklearn.metrics import (
     accuracy_score,
+    accuracy_score as _acc,
     average_precision_score,
     f1_score,
     roc_auc_score,
 )
+from sklearn.model_selection import StratifiedKFold
+
+from svm_gmu import SvmGmu
 
 
 _VAR_FLOOR = 1e-6
@@ -156,3 +160,22 @@ def augmentation_cloud(
         ang = rng.uniform(-rot_range, rot_range)
         rows[j] = augment_image(img28, rng, ang, max_shift).ravel()
     return rows
+
+
+def select_lambda_cv(X, y, su, lam_grid, n_folds, seed, svm_kwargs) -> float:
+    """Pick lambda by best mean stratified k-fold validation accuracy."""
+    X = np.asarray(X, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+    best_lam, best_acc = lam_grid[0], -1.0
+    for lam in lam_grid:
+        fold_acc = []
+        for tr, va in skf.split(X, y):
+            su_tr = None if su is None else [su[i] for i in tr]
+            model = SvmGmu(lam=lam, random_state=seed, **svm_kwargs)
+            model.fit(X[tr], y[tr], sample_uncertainty=su_tr)
+            fold_acc.append(_acc(y[va], model.predict(X[va])))
+        mean_acc = float(np.mean(fold_acc))
+        if mean_acc > best_acc:
+            best_acc, best_lam = mean_acc, lam
+    return best_lam

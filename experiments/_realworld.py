@@ -27,3 +27,22 @@ def augment_image(
     sy = rng.uniform(-max_shift, max_shift)
     out = ndimage.shift(out, (sy, sx), order=1, mode="constant", cval=0.0)
     return out.astype(np.float64)
+
+
+def augmentation_cloud(
+    img_flat: NDArray[np.floating],
+    n_aug: int,
+    rng: np.random.Generator,
+    rot_range: float,
+    max_shift: float,
+) -> NDArray[np.float64]:
+    """Return an (n_aug, 784) cloud of flattened augmentations of one image.
+
+    Rotation angle of each draw is uniform in [-rot_range, rot_range] degrees.
+    """
+    img28 = np.asarray(img_flat, dtype=np.float64).reshape(28, 28)
+    rows = np.empty((n_aug, 784), dtype=np.float64)
+    for j in range(n_aug):
+        ang = rng.uniform(-rot_range, rot_range)
+        rows[j] = augment_image(img28, rng, ang, max_shift).ravel()
+    return rows

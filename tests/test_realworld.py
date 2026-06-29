@@ -74,3 +74,22 @@ def test_structural_components_shapes():
     assert su["weights"].shape == (4,) and np.isclose(su["weights"].sum(), 1.0)
     assert su["means"].shape == (4, 3)
     assert su["covariances"].shape == (4, 3)
+
+
+def test_evaluate_metrics_perfect():
+    y = np.array([1.0, 1.0, -1.0, -1.0])
+    pred = y.copy()
+    score = np.array([2.0, 1.0, -1.0, -2.0])
+    m = RW.evaluate_metrics(y, pred, score)
+    assert m["accuracy"] == 1.0
+    assert m["f1"] == 1.0
+    assert m["auc"] == 1.0
+    assert m["ap"] == 1.0
+
+
+def test_evaluate_metrics_half_accuracy():
+    y = np.array([1.0, 1.0, -1.0, -1.0])
+    pred = np.array([1.0, -1.0, 1.0, -1.0])
+    score = np.array([0.1, -0.1, 0.1, -0.1])
+    m = RW.evaluate_metrics(y, pred, score)
+    assert np.isclose(m["accuracy"], 0.5)

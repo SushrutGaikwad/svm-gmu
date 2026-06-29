@@ -9,6 +9,12 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from scipy import ndimage
+from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    f1_score,
+    roc_auc_score,
+)
 
 
 _VAR_FLOOR = 1e-6
@@ -86,6 +92,21 @@ def structural_components(
         "weights": np.full(k, 1.0 / k),
         "means": np.array(means),
         "covariances": np.array(covs),
+    }
+
+
+def evaluate_metrics(
+    y_true: NDArray[np.floating],
+    y_pred: NDArray[np.floating],
+    y_score: NDArray[np.floating],
+) -> dict:
+    """Accuracy, macro-F1, ROC-AUC, and average precision for a binary task."""
+    y_bin = (np.asarray(y_true) == 1.0).astype(int)
+    return {
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "f1": float(f1_score(y_true, y_pred, average="macro")),
+        "auc": float(roc_auc_score(y_bin, y_score)),
+        "ap": float(average_precision_score(y_bin, y_score)),
     }
 
 

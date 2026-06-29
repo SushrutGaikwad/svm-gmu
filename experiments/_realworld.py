@@ -10,6 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy import ndimage
 from scipy.stats import binomtest, ttest_rel, wilcoxon
+from sklearn.decomposition import PCA
 from sklearn.metrics import (
     accuracy_score,
     accuracy_score as _acc,
@@ -17,9 +18,14 @@ from sklearn.metrics import (
     f1_score,
     roc_auc_score,
 )
+from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import StratifiedKFold
 
 from svm_gmu import SvmGmu
+
+
+_M_CANDIDATES = list(range(1, 9))
+_N_INIT = 3
 
 
 _VAR_FLOOR = 1e-6
@@ -203,3 +209,74 @@ def select_lambda_cv(X, y, su, lam_grid, n_folds, seed, svm_kwargs) -> float:
         if mean_acc > best_acc:
             best_acc, best_lam = mean_acc, lam
     return best_lam
+
+
+def fit_gmm_bic_cov(cloud, m_candidates, n_init, seed, cov_type="diag") -> dict:
+    """Fit a GMM choosing the component count by BIC, with the given cov type.
+
+    Returns weights (M,), means (M, d), and covariances shaped (M, d) for
+    'diag' or (M, d, d) for 'full', matching the SvmGmu uncertainty format.
+    """
+    best_bic, best = np.inf, None
+    for m in m_candidates:
+        gm = GaussianMixture(
+            n_components=m, covariance_type=cov_type, n_init=n_init, random_state=seed
+        ).fit(cloud)
+        bic = gm.bic(cloud)
+        if bic < best_bic:
+            best_bic, best = bic, gm
+    return {
+        "weights": best.weights_.copy(),
+        "means": best.means_.copy(),
+        "covariances": best.covariances_.copy(),
+    }
+
+
+def _select_examples(images, labels, digit, n, rng):
+    idx = np.where(labels == digit)[0]
+    chosen = rng.choice(idx, size=n, replace=False)
+    return images[chosen]
+
+
+def run_mnist_seed(
+    images, labels, digit_pos, digit_neg, seed, *,
+    n_train, n_test, n_aug, rot_range, max_shift, pca_dim,
+    k_anchors, n_per_anchor, lam_grid, n_folds, svm_kwargs, cov_type="diag",
+) -> dict:
+    """One seed of the MNIST GMU-vs-GSU comparison; builds the ladder and metrics."""
+    rng = np.random.default_rng(seed)
+
+    # Disjoint train and test images for each digit.
+    pos = _select_examples(images, labels, digit_pos, n_train + n_test, rng)
+    neg = _select_examples(images, labels, digit_neg, n_train + n_test, rng)
+    pos_tr, pos_te = pos[:n_train], pos[n_train:]
+    neg_tr, neg_te = neg[:n_train], neg[n_train:]
+
+    train_imgs = np.vstack([pos_tr, neg_tr])
+    test_imgs = np.vstack([pos_te, neg_te])
+    y_tr = np.array([1.0] * n_train + [-1.0] * n_train)
+    y_te = np.array([1.0] * n_test + [-1.0] * n_test)
+
+    # Augmentation clouds for the training images, then PCA on the pooled clouds.
+    clouds = [augmentation_cloud(img, n_aug, rng, rot_range, max_shift) for img in train_imgs]
+    pca = PCA(n_components=pca_dim, random_state=seed).fit(np.vstack(clouds))
+
+    clouds_pca = [pca.transform(c) for c in clouds]
+    X_tr = pca.transform(train_imgs)
+    X_te = pca.transform(test_imgs)
+
+    # Uncertainty ladder per training example.
+    su_iso = [iso_gaussian(c) for c in clouds_pca]
+    su_m0 = [moment_gaussian(c, cov_type) for c in clouds_pca]
+    su_m1 = [
+        structural_components(img, k_anchors, rot_range, n_per_anchor, rng, max_shift, pca, cov_type)
+        for img in train_imgs
+    ]
+    su_m2 = [fit_gmm_bic_cov(c, _M_CANDIDATES, _N_INIT, seed, cov_type) for c in clouds_pca]
+    bic_counts = [len(g["weights"]) for g in su_m2]
+
+    su_by_model = {"B0": None, "B1": su_iso, "M0": su_m0, "M1": su_m1, "M2": su_m2}
+    models = run_ladder(X_tr, y_tr, X_te, y_te, su_by_model, lam_grid, n_folds, svm_kwargs, seed)
+
+    mcnemar_p = mcnemar_pvalue(y_te, models["M2"]["y_pred"], models["M0"]["y_pred"])
+    return {"models": models, "mcnemar_p": mcnemar_p, "bic_counts": bic_counts}

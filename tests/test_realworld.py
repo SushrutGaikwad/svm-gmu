@@ -142,3 +142,24 @@ def test_run_ladder_keys_and_separable_accuracy():
     for key in res:
         assert 0.0 <= res[key]["metrics"]["accuracy"] <= 1.0
     assert res["M0"]["metrics"]["accuracy"] > 0.8
+
+
+def test_run_mnist_seed_smoke():
+    rng = np.random.default_rng(0)
+    imgs, labs = [], []
+    for _ in range(30):
+        im = np.zeros((28, 28)); im[5:10, :] = rng.uniform(0.5, 1.0, (5, 28))
+        imgs.append(im.ravel()); labs.append(4)
+    for _ in range(30):
+        im = np.zeros((28, 28)); im[18:23, :] = rng.uniform(0.5, 1.0, (5, 28))
+        imgs.append(im.ravel()); labs.append(9)
+    images = np.array(imgs); labels = np.array(labs)
+    out = RW.run_mnist_seed(
+        images, labels, digit_pos=4, digit_neg=9, seed=0,
+        n_train=10, n_test=10, n_aug=40, rot_range=15.0, max_shift=1.0,
+        pca_dim=5, k_anchors=4, n_per_anchor=15, lam_grid=[1e-2, 1e-1],
+        n_folds=3, svm_kwargs=dict(max_iter=300, batch_size=8), cov_type="diag",
+    )
+    assert {"B0", "B1", "M0", "M1", "M2"}.issubset(out["models"].keys())
+    assert "mcnemar_p" in out and 0.0 <= out["mcnemar_p"] <= 1.0
+    assert len(out["bic_counts"]) == 20  # n_train per class x 2 = 20 training mixtures

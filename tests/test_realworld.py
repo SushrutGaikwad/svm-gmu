@@ -115,6 +115,13 @@ def test_paired_seed_tests_detects_difference():
     assert r["ttest_p"] < 0.05
 
 
+def test_paired_seed_tests_all_equal_is_not_significant():
+    a = np.array([0.9, 0.9, 0.9])
+    r = RW.paired_seed_tests(a, a.copy())
+    assert r["wilcoxon_p"] == 1.0
+    assert r["ttest_p"] == 1.0
+
+
 def test_select_lambda_returns_grid_value():
     rng = np.random.default_rng(0)
     X = np.vstack([rng.normal(2, 0.5, (20, 2)), rng.normal(-2, 0.5, (20, 2))])

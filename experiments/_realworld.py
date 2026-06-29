@@ -142,10 +142,13 @@ def paired_seed_tests(acc_a, acc_b) -> dict:
     """Paired Wilcoxon signed-rank and paired t-test over per-seed accuracies."""
     acc_a = np.asarray(acc_a, dtype=float)
     acc_b = np.asarray(acc_b, dtype=float)
+    if np.all(acc_a == acc_b):
+        # No paired differences: tests are degenerate, report not significant.
+        return {"wilcoxon_p": 1.0, "ttest_p": 1.0}
     try:
         w_p = float(wilcoxon(acc_a, acc_b).pvalue)
     except ValueError:
-        w_p = 1.0  # zero differences across all seeds
+        w_p = 1.0
     t_p = float(ttest_rel(acc_a, acc_b).pvalue)
     return {"wilcoxon_p": w_p, "ttest_p": t_p}
 

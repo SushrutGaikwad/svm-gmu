@@ -93,3 +93,23 @@ def test_evaluate_metrics_half_accuracy():
     score = np.array([0.1, -0.1, 0.1, -0.1])
     m = RW.evaluate_metrics(y, pred, score)
     assert np.isclose(m["accuracy"], 0.5)
+
+
+def test_mcnemar_identical_is_one():
+    y = np.array([1.0, -1.0, 1.0, -1.0])
+    assert RW.mcnemar_pvalue(y, y.copy(), y.copy()) == 1.0
+
+
+def test_mcnemar_one_sided_is_small():
+    y = np.ones(12)
+    a = np.ones(12)        # a always right
+    b = -np.ones(12)       # b always wrong
+    assert RW.mcnemar_pvalue(y, a, b) < 0.05
+
+
+def test_paired_seed_tests_detects_difference():
+    a = np.array([0.90, 0.92, 0.88, 0.91, 0.93])
+    b = np.array([0.80, 0.82, 0.79, 0.81, 0.83])
+    r = RW.paired_seed_tests(a, b)
+    assert r["wilcoxon_p"] < 0.1
+    assert r["ttest_p"] < 0.05

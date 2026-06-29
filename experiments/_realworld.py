@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from scipy import ndimage
+from scipy.stats import binomtest, ttest_rel, wilcoxon
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
@@ -108,6 +109,34 @@ def evaluate_metrics(
         "auc": float(roc_auc_score(y_bin, y_score)),
         "ap": float(average_precision_score(y_bin, y_score)),
     }
+
+
+def mcnemar_pvalue(
+    y_true: NDArray[np.floating],
+    pred_a: NDArray[np.floating],
+    pred_b: NDArray[np.floating],
+) -> float:
+    """Exact two-sided McNemar p-value comparing two classifiers' predictions."""
+    a_ok = np.asarray(pred_a) == np.asarray(y_true)
+    b_ok = np.asarray(pred_b) == np.asarray(y_true)
+    n01 = int(np.sum(a_ok & ~b_ok))
+    n10 = int(np.sum(~a_ok & b_ok))
+    n = n01 + n10
+    if n == 0:
+        return 1.0
+    return float(binomtest(min(n01, n10), n, 0.5, alternative="two-sided").pvalue)
+
+
+def paired_seed_tests(acc_a, acc_b) -> dict:
+    """Paired Wilcoxon signed-rank and paired t-test over per-seed accuracies."""
+    acc_a = np.asarray(acc_a, dtype=float)
+    acc_b = np.asarray(acc_b, dtype=float)
+    try:
+        w_p = float(wilcoxon(acc_a, acc_b).pvalue)
+    except ValueError:
+        w_p = 1.0  # zero differences across all seeds
+    t_p = float(ttest_rel(acc_a, acc_b).pvalue)
+    return {"wilcoxon_p": w_p, "ttest_p": t_p}
 
 
 def augmentation_cloud(

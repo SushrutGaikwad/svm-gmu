@@ -106,6 +106,39 @@ def structural_components(
     }
 
 
+def bimodal_structural_components(
+    img_flat: NDArray[np.floating],
+    rng: np.random.Generator,
+    rot_mag: float,
+    jitter: float,
+    n_per_mode: int,
+    max_shift: float,
+    pca,
+    cov_type: str = "diag",
+) -> dict:
+    """EM-free two-component mixture, one component at each rotation mode.
+
+    Matches the bimodal augmentation: one Gaussian fit at +rot_mag and one at
+    -rot_mag (each with Gaussian jitter), in PCA space. This is the no-EM GMU
+    representative for bimodal uncertainty.
+    """
+    img28 = np.asarray(img_flat, dtype=np.float64).reshape(28, 28)
+    means, covs = [], []
+    for sign in (-1.0, 1.0):
+        batch = np.array([
+            augment_image(img28, rng, sign * rot_mag + rng.normal(0.0, jitter), max_shift).ravel()
+            for _ in range(n_per_mode)
+        ])
+        comp = moment_gaussian(pca.transform(batch), cov_type)
+        means.append(comp["means"][0])
+        covs.append(comp["covariances"][0])
+    return {
+        "weights": np.array([0.5, 0.5]),
+        "means": np.array(means),
+        "covariances": np.array(covs),
+    }
+
+
 def evaluate_metrics(
     y_true: NDArray[np.floating],
     y_pred: NDArray[np.floating],
@@ -168,6 +201,29 @@ def augmentation_cloud(
     for j in range(n_aug):
         ang = rng.uniform(-rot_range, rot_range)
         rows[j] = augment_image(img28, rng, ang, max_shift).ravel()
+    return rows
+
+
+def bimodal_augmentation_cloud(
+    img_flat: NDArray[np.floating],
+    n_aug: int,
+    rng: np.random.Generator,
+    rot_mag: float,
+    jitter: float,
+    max_shift: float,
+) -> NDArray[np.float64]:
+    """Return an (n_aug, 784) cloud with bimodal rotation.
+
+    Each draw is rotated by +rot_mag or -rot_mag (equiprobable) plus Gaussian
+    jitter of standard deviation `jitter` degrees, then translated. The two
+    lobes make the cloud genuinely non-Gaussian, so a single Gaussian smears
+    mass across the empty middle while a mixture captures the lobes.
+    """
+    img28 = np.asarray(img_flat, dtype=np.float64).reshape(28, 28)
+    rows = np.empty((n_aug, 784), dtype=np.float64)
+    for j in range(n_aug):
+        ang = rng.choice([-1.0, 1.0]) * rot_mag + rng.normal(0.0, jitter)
+        rows[j] = augment_image(img28, rng, float(ang), max_shift).ravel()
     return rows
 
 
@@ -245,8 +301,17 @@ def run_mnist_seed(
     images, labels, digit_pos, digit_neg, seed, *,
     n_train, n_test, n_aug, rot_range, max_shift, pca_dim,
     k_anchors, n_per_anchor, lam_grid, n_folds, svm_kwargs, cov_type="diag",
+    aug_mode="uniform", jitter=0.0, augment_test=False, test_aug_per=10,
 ) -> dict:
-    """One seed of the MNIST GMU-vs-GSU comparison; builds the ladder and metrics."""
+    """One seed of the MNIST GMU-vs-GSU comparison; builds the ladder and metrics.
+
+    aug_mode "uniform" rotates each draw uniformly in [-rot_range, rot_range];
+    "bimodal" rotates by +/-rot_range (two lobes) with Gaussian `jitter` degrees,
+    giving genuinely non-Gaussian per-example uncertainty. When augment_test is
+    True the test images are augmented the same way and the models are scored on
+    those augmented points, which is where uncertainty modeling pays off (the
+    noisy-test-set regime of the SVM-GSU paper).
+    """
     rng = np.random.default_rng(seed)
 
     # Disjoint train and test images for each digit.
@@ -258,23 +323,45 @@ def run_mnist_seed(
     train_imgs = np.vstack([pos_tr, neg_tr])
     test_imgs = np.vstack([pos_te, neg_te])
     y_tr = np.array([1.0] * n_train + [-1.0] * n_train)
-    y_te = np.array([1.0] * n_test + [-1.0] * n_test)
+    y_test_img = np.array([1.0] * n_test + [-1.0] * n_test)
+
+    def make_cloud(img, n):
+        if aug_mode == "bimodal":
+            return bimodal_augmentation_cloud(img, n, rng, rot_range, jitter, max_shift)
+        return augmentation_cloud(img, n, rng, rot_range, max_shift)
 
     # Augmentation clouds for the training images, then PCA on the pooled clouds.
-    clouds = [augmentation_cloud(img, n_aug, rng, rot_range, max_shift) for img in train_imgs]
+    clouds = [make_cloud(img, n_aug) for img in train_imgs]
     pca = PCA(n_components=pca_dim, random_state=seed).fit(np.vstack(clouds))
 
     clouds_pca = [pca.transform(c) for c in clouds]
     X_tr = pca.transform(train_imgs)
-    X_te = pca.transform(test_imgs)
+
+    # Test set: clean observed points, or augmented points when augment_test.
+    if augment_test:
+        aug_pts, aug_y = [], []
+        for img, yi in zip(test_imgs, y_test_img):
+            aug_pts.append(pca.transform(make_cloud(img, test_aug_per)))
+            aug_y.append(np.full(test_aug_per, yi))
+        X_te = np.vstack(aug_pts)
+        y_te = np.concatenate(aug_y)
+    else:
+        X_te = pca.transform(test_imgs)
+        y_te = y_test_img
 
     # Uncertainty ladder per training example.
     su_iso = [iso_gaussian(c) for c in clouds_pca]
     su_m0 = [moment_gaussian(c, cov_type) for c in clouds_pca]
-    su_m1 = [
-        structural_components(img, k_anchors, rot_range, n_per_anchor, rng, max_shift, pca, cov_type)
-        for img in train_imgs
-    ]
+    if aug_mode == "bimodal":
+        su_m1 = [
+            bimodal_structural_components(img, rng, rot_range, jitter, n_per_anchor, max_shift, pca, cov_type)
+            for img in train_imgs
+        ]
+    else:
+        su_m1 = [
+            structural_components(img, k_anchors, rot_range, n_per_anchor, rng, max_shift, pca, cov_type)
+            for img in train_imgs
+        ]
     su_m2 = [fit_gmm_bic_cov(c, _M_CANDIDATES, _N_INIT, seed, cov_type) for c in clouds_pca]
     bic_counts = [len(g["weights"]) for g in su_m2]
 
@@ -311,6 +398,9 @@ def _per_seed_kwargs(config, n_train, rot_range):
         k_anchors=config["k_anchors"], n_per_anchor=config["n_per_anchor"],
         lam_grid=config["lam_grid"], n_folds=config["n_folds"],
         svm_kwargs=config["svm_kwargs"], cov_type=config["cov_type"],
+        aug_mode=config.get("aug_mode", "uniform"), jitter=config.get("jitter", 0.0),
+        augment_test=config.get("augment_test", False),
+        test_aug_per=config.get("test_aug_per", 10),
     )
 
 

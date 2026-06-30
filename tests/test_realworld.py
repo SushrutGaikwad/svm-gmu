@@ -231,3 +231,41 @@ def test_make_sweep_figure_runs():
     fig = RW.make_sweep_figure(res["rot_sweep"], xlabel="Rotation range (deg)", title="Accuracy vs rotation")
     assert fig is not None
     assert len(fig.axes) >= 1
+
+
+def test_bimodal_augmentation_cloud_shape_and_nonconstant():
+    img = np.zeros(784)
+    img[300:320] = 1.0
+    rng = np.random.default_rng(0)
+    cloud = RW.bimodal_augmentation_cloud(img, 32, rng, rot_mag=30.0, jitter=4.0, max_shift=0.0)
+    assert cloud.shape == (32, 784)
+    assert not np.allclose(cloud, img[None, :])  # rotation is applied
+
+
+def test_bimodal_structural_components_two_modes():
+    rng = np.random.default_rng(0)
+    img = np.zeros(784)
+    img[300:316] = 1.0
+    pool = RW.bimodal_augmentation_cloud(img, 60, rng, rot_mag=30.0, jitter=4.0, max_shift=0.0)
+    pca = PCA(n_components=3, random_state=0).fit(pool)
+    su = RW.bimodal_structural_components(
+        img, rng, rot_mag=30.0, jitter=4.0, n_per_mode=20, max_shift=0.0, pca=pca, cov_type="diag"
+    )
+    assert su["weights"].shape == (2,) and np.isclose(su["weights"].sum(), 1.0)
+    assert su["means"].shape == (2, 3)
+    assert su["covariances"].shape == (2, 3)
+
+
+def test_run_mnist_seed_bimodal_augtest():
+    images, labels = _fake_mnist(np.random.default_rng(0))
+    out = RW.run_mnist_seed(
+        images, labels, digit_pos=4, digit_neg=9, seed=0,
+        n_train=8, n_test=6, n_aug=40, rot_range=30.0, max_shift=1.0,
+        pca_dim=5, k_anchors=4, n_per_anchor=15, lam_grid=[1e-2, 1e-1],
+        n_folds=2, svm_kwargs=dict(max_iter=300, batch_size=8), cov_type="diag",
+        aug_mode="bimodal", jitter=4.0, augment_test=True, test_aug_per=5,
+    )
+    assert {"B0", "B1", "M0", "M1", "M2"}.issubset(out["models"].keys())
+    assert 0.0 <= out["mcnemar_p"] <= 1.0
+    # augmented test set has 2 * n_test * test_aug_per points
+    assert len(out["models"]["M2"]["y_pred"]) == 2 * 6 * 5

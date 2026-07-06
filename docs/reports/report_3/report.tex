@@ -1276,7 +1276,12 @@ To quantify how close a learned boundary is to the reference SVM-GMU boundary, w
         \Delta_N^{\text{offset}} = \left|\frac{b_N}{\|\vb{w}_N\|} - \frac{b_{\text{ref}}}{\|\vb{w}_{\text{ref}}\|}\right|.
     \end{equation}
     Since $-\frac{b}{\|\vb{w}\|}$ is the signed distance from the origin to the hyperplane, this is the displacement of one boundary relative to the other along their shared normal direction.
-    \item \textbf{Grid RMS:} the root-mean-square difference between the two \emph{unit-normalized} decision functions, evaluated on a dense grid. Writing $\hat{f}(\vb{x}) = \widehat{\vb{w}}^{\intercal}\vb{x} + \frac{b}{\|\vb{w}\|}$ for the unit-normalized decision function of a boundary $(\vb{w}, b)$, so that $\hat{f}_N$ is this function built from the learned boundary $(\vb{w}_N, b_N)$ and $\hat{f}_{\text{ref}}$ is the same function built from the reference SVM-GMU boundary $(\vb{w}_{\text{ref}}, b_{\text{ref}})$, and letting $\{\vb{x}_g\}_{g=1}^{G}$ be the $G = 60 \times 60 = 3600$ points of a regular grid over the plotting window $[-5, 5] \times [-4, 5]$,
+    \item \textbf{Grid RMS:} the root-mean-square difference between the two \emph{unit-normalized} decision functions, evaluated on a dense grid. Writing
+    \begin{equation}\label{eq:unit_normalized_decision}
+        \hat{f}(\vb{x}) = \widehat{\vb{w}}^{\intercal}\vb{x} + \frac{b}{\|\vb{w}\|},
+        \qquad \widehat{\vb{w}} = \frac{\vb{w}}{\|\vb{w}\|},
+    \end{equation}
+    for the unit-normalized decision function of a boundary $(\vb{w}, b)$, so that $\hat{f}_N$ is this function built from the learned boundary $(\vb{w}_N, b_N)$ and $\hat{f}_{\text{ref}}$ is the same function built from the reference SVM-GMU boundary $(\vb{w}_{\text{ref}}, b_{\text{ref}})$, and letting $\{\vb{x}_g\}_{g=1}^{G}$ be the $G = 60 \times 60 = 3600$ points of a regular grid over the plotting window $[-5, 5] \times [-4, 5]$,
     \begin{equation}
         \Delta_N^{\text{grid}} = \sqrt{\frac{1}{G}\sum_{g=1}^{G}\left(\hat{f}_N(\vb{x}_g) - \hat{f}_{\text{ref}}(\vb{x}_g)\right)^2}.
     \end{equation}
@@ -1540,7 +1545,7 @@ The grid RMS of \cref{sec:exp_convergence} evaluates the decision functions on a
 \begin{equation}\label{eq:exp_mc_rms}
     \Delta^{\text{mc}} = \sqrt{\frac{1}{G}\sum_{g=1}^{G}\left(\hat{f}_N(\vb{x}_g) - \hat{f}_{\text{ref}}^d(\vb{x}_g)\right)^2},
 \end{equation}
-with $\hat{f}$ the unit-normalized decision function of \cref{sec:exp_convergence}. The angle $\theta$ and the offset $\Delta^{\text{offset}}$ are dimension-agnostic already and carry over unchanged.
+with $\hat{f}$ the unit-normalized decision function defined in \cref{eq:unit_normalized_decision}. The angle $\theta$ and the offset $\Delta^{\text{offset}}$ are dimension-agnostic already and carry over unchanged.
 
 The closed-form reference $(\vb{w}_{\text{ref}}^d, b_{\text{ref}}^d)$ is obtained by minimizing the SVM-GMU objective \cref{eq:gmu_objective} on the analytic mixtures; it is exact at every $d$ and never samples. For each dimension $d \in \{2, 3, 5, 10, 20, 50\}$ and each of $R = 30$ seeds (each seed drawing a fresh dataset and fresh samples), we sweep $N$ over a geometric ladder (a sequence whose values grow by a roughly constant multiplicative factor, here about $\times 3$ per step, so a handful of ``rungs'' span several orders of magnitude) $\{10, 30, 100, 300, 1000, 3000, 10^4, 3\times10^4\}$, fit a standard SVM to the $10N$-point cloud at each rung, and record $\theta$ against the reference. We define
 \begin{equation}\label{eq:exp_nstar}
@@ -1579,7 +1584,9 @@ the smallest number of samples per example at which the standard SVM matches the
     \label{fig:exp_high_dim_nstar}
 \end{figure}
 
-The complementary view fixes the sample budget and watches the error grow with dimension. \Cref{fig:exp_high_dim_budget} does this for $N = 1000$ and $N = 10^4$ samples per example: the median angle to the reference rises from $0.59^\circ$ at $d = 2$ to $6.93^\circ$ at $d = 50$ for $N = 1000$, and from $0.27^\circ$ to $2.91^\circ$ for $N = 10^4$, whereas the closed-form SVM-GMU sits at exactly $0^\circ$ for every $d$.
+\paragraph{What a ``sample budget'' is, and two ways to read the same trade-off.} A \emph{sample budget} is just the number of random draws $N$ we allow ourselves \emph{per example} when feeding the standard SVM; with $n = 10$ examples a budget of $N$ means $10N$ sampled points in total. We call it a budget because every draw has a price (memory to hold it and time to train on it), so in practice one sets a ceiling and lives within it, exactly as one lives within a fixed amount of money. The experiment probes a single trade-off between how much we spend (the budget $N$) and how hard the problem is (the dimension $d$), and there are two equally valid ways to read it. \Cref{tab:exp_high_dim} fixes the \emph{quality} we demand (the angular tolerance $\tau$) and asks how large a budget $N^\ast(d)$ is needed to reach it, like asking ``how much money would it take to furnish this house to a decent standard?''. The fixed-budget view does the mirror image: it pins the budget at $N = 1000$ or $N = 10^4$ and watches the quality slip as $d$ grows, like asking ``with only a thousand dollars in hand, how well can I furnish the house?''. The same picture explains \emph{why} the quality slips: a higher-dimensional distribution spreads its probability mass over ever more directions, just as a bigger house has ever more rooms, so a fixed budget is stretched thinner and each room is furnished more sparsely. One further reason to show both views: when the dimension is so high that even the largest budget on our ladder ($3\times10^4$) still cannot reach the tolerance, the first view can only report ``off the top of the ladder'', whereas the fixed-budget view still returns an honest number for how far off the boundary is.
+
+\Cref{fig:exp_high_dim_budget} carries out this second, fixed-budget reading for $N = 1000$ and $N = 10^4$ samples per example: the median angle to the reference rises from $0.59^\circ$ at $d = 2$ to $6.93^\circ$ at $d = 50$ for $N = 1000$, and from $0.27^\circ$ to $2.91^\circ$ for $N = 10^4$, whereas the closed-form SVM-GMU sits at exactly $0^\circ$ for every $d$.
 
 \begin{figure}[H]
     \centering

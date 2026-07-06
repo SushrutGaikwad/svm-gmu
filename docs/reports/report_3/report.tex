@@ -17,6 +17,9 @@
 \hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
 \usepackage{cleveref}
 \usepackage{graphicx}
+% Rasterized layers inside the .pgf figures reference their sidecar PNGs by
+% bare filename; resolve them from the graphics/ directory.
+\graphicspath{{graphics/}}
 \usepackage{float}
 \usepackage{booktabs}
 \usepackage{caption}
@@ -1317,7 +1320,7 @@ If the Monte Carlo argument above is correct, all three metrics should tend to z
 \Cref{fig:exp_conv_boundaries} shows the visual counterpart of the metrics table: one panel per value of $N$, each depicting
 \begin{enumerate}
     \item the GMM contours of the original six observed points,
-    \item the sampled cloud used to fit that panel's standard SVM (subsampled to at most $800$ points for readability),
+    \item the sampled cloud used to fit that panel's standard SVM (all $6N$ points are shown),
     \item the reference SVM-GMU boundary as a dashed green line, and
     \item the standard SVM boundary as a solid black line.
 \end{enumerate}
@@ -1499,7 +1502,7 @@ In short, BIC only decides how many Gaussians to use when reconstructing each ex
 \begin{figure}[htbp]
     \centering
     \resizebox{!}{0.93\textheight}{\input{graphics/em_fitted_gmu_convergence.pgf}}
-    \caption{One panel per $N$: the EM-fitted GMM contours of the six points (at the $3\sigma$ level), the reference SVM-GMU boundary (green dashed), and the SVM-GMU boundary fit on the estimated GMMs (black solid). As $N$ grows the fitted contours recover the true banana and crescent shapes and the black boundary approaches the green reference.}
+    \caption{One panel per $N$: the sampled cloud the EM fits were trained on (all $6N$ points are shown), the EM-fitted GMM contours (at the $3\sigma$ level), the reference SVM-GMU boundary (green dashed), and the SVM-GMU boundary fit on the estimated GMMs (black solid). As $N$ grows the cloud fills out the true banana and crescent shapes, the fitted contours recover them, and the black boundary approaches the green reference.}
     \label{fig:exp_em_panels}
 \end{figure}
 

@@ -20,7 +20,7 @@ from sklearn.metrics import (
 from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import StratifiedKFold
 
-from _common import band, make_seeds
+from _common import band, make_seeds, svm_iter_for
 from svm_gmu import SvmGmu
 
 
@@ -291,6 +291,42 @@ def fit_gmm_bic_cov(cloud, m_candidates, n_init, seed, cov_type="diag") -> dict:
     }
 
 
+def fit_augmented_baseline(clouds_pca, y_tr, X_te, y_te, lam, seed) -> dict:
+    """Standard SVM trained on every augmented point as ordinary training data.
+
+    This is the classic data-augmentation baseline, and the strongest
+    uncertainty-blind competitor: rather than summarising each cloud into an
+    uncertainty description, it pours all of the augmented points into the
+    training set and fits a plain hinge-loss SVM on them. It therefore *does*
+    see every rotation and jitter, unlike the B0 baseline, which sees only the
+    clean images.
+
+    Iterations and mini-batch size follow the repository's convention for
+    fitting on a sampled cloud (``_common.fit_standard_svm_on_cloud``), so the
+    much larger training set is not starved of updates relative to the rungs
+    that train on a handful of examples.
+    """
+    X_aug = np.vstack(clouds_pca)
+    n_aug = clouds_pca[0].shape[0]
+    y_aug = np.repeat(np.asarray(y_tr, dtype=np.float64), n_aug)
+    model = SvmGmu(
+        lam=lam, random_state=seed,
+        max_iter=svm_iter_for(len(X_aug)), batch_size=256,
+    )
+    model.fit(X_aug, y_aug, sample_uncertainty=None)
+    y_pred = model.predict(X_te)
+    y_score = model.decision_function(X_te)
+    return {
+        "lam": lam,
+        "w": model.coef_.copy(),
+        "b": float(model.intercept_),
+        "y_pred": y_pred,
+        "y_score": y_score,
+        "metrics": evaluate_metrics(y_te, y_pred, y_score),
+        "n_train_points": int(X_aug.shape[0]),
+    }
+
+
 def _select_examples(images, labels, digit, n, rng):
     idx = np.where(labels == digit)[0]
     chosen = rng.choice(idx, size=n, replace=False)
@@ -302,6 +338,7 @@ def run_mnist_seed(
     n_train, n_test, n_aug, rot_range, max_shift, pca_dim,
     k_anchors, n_per_anchor, lam_grid, n_folds, svm_kwargs, cov_type="diag",
     aug_mode="uniform", jitter=0.0, augment_test=False, test_aug_per=10,
+    include_aug_baseline=False,
 ) -> dict:
     """One seed of the MNIST GMU-vs-GSU comparison; builds the ladder and metrics.
 
@@ -368,6 +405,13 @@ def run_mnist_seed(
     su_by_model = {"B0": None, "B1": su_iso, "M0": su_m0, "M1": su_m1, "M2": su_m2}
     models = run_ladder(X_tr, y_tr, X_te, y_te, su_by_model, lam_grid, n_folds, svm_kwargs, seed)
 
+    # Optional sixth model, kept out of su_by_model because it trains on a
+    # different X (every augmented point) rather than on the 160 examples.
+    if include_aug_baseline:
+        models["B0aug"] = fit_augmented_baseline(
+            clouds_pca, y_tr, X_te, y_te, lam_grid[0], seed
+        )
+
     mcnemar_p = mcnemar_pvalue(y_te, models["M2"]["y_pred"], models["M0"]["y_pred"])
     return {
         "models": models,
@@ -375,6 +419,8 @@ def run_mnist_seed(
         "bic_counts": bic_counts,
         "clouds_pca": clouds_pca,
         "y_tr": y_tr,
+        "X_te": X_te,
+        "y_te": y_te,
     }
 
 

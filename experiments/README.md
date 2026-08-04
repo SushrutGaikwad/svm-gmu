@@ -73,7 +73,7 @@ per-seed and full-experiment drivers (`run_mnist_seed`,
 | `svm_gmu_convergence.ipynb` | Exp 2: Monte-Carlo convergence | `convergence_metrics.pgf`, `svm_gmu_convergence.pgf` | `.cache/conv_metrics_full.npz` | ~10 min |
 | `gmu_vs_gsu_approximation.ipynb` | Exp 3: does the mixture matter | `gmu_vs_gsu_approximation.pgf` | none | seconds |
 | `em_fitted_gmu.ipynb` | Exp 4: learn uncertainty by EM | `em_convergence_metrics.pgf`, `em_fitted_gmu_convergence.pgf` | `.cache/em_full.pkl` | ~28 min |
-| `high_dim_scaling.ipynb` | Exp 5: scaling with dimension | `high_dim_nstar.pgf`, `high_dim_fixed_budget.pgf` | `.cache/high_dim_gmm_full.npz` | minutes |
+| `high_dim_scaling.ipynb` | Exp 5: scaling with dimension | `high_dim_nstar.pgf`, `high_dim_fixed_budget.pgf`, `high_dim_rms.pgf`, `high_dim_offset.pgf` | `.cache/high_dim_gmm_full.npz` | ~6 h (incremental) |
 | `realworld_mnist_30seed.ipynb` | Exp 6: real-data SVM-GMU vs SVM-GSU on MNIST | `realworld_mnist_30seed_rotation.pgf`, `realworld_mnist_30seed_trainsize.pgf`, `realworld_mnist_30seed_panel.pgf` | `.cache/realworld_mnist_30seed.pkl` | ~2-3 h |
 | `realworld_mnist.ipynb` | Exp 6 pilot (10 seeds, same config) | `realworld_mnist_rotation.pgf`, `realworld_mnist_trainsize.pgf`, `realworld_mnist_panel.pgf` (not referenced by the report) | `.cache/realworld_mnist.pkl` | ~40-60 min |
 
@@ -110,9 +110,18 @@ over many seeds); the first run is about 28 minutes, then instant from cache.
 ### Exp 5 - `high_dim_scaling.ipynb`
 
 Builds a genuinely d-dimensional Gaussian-mixture dataset for each
-`d` in {2, 3, 5, 10, 20, 50} and measures `N*(d)`, the samples-per-example a
+`d` in {2, 3, 5, 10, 20, 35, 50} and measures `N*(d)`, the samples-per-example a
 standard SVM needs to match the closed-form SVM-GMU boundary to a fixed angular
-tolerance, plus a fixed-budget angle-versus-`d` view.
+tolerance, plus three fixed-budget views versus `d`: the angle, the Monte-Carlo
+decision-function RMS, and the offset difference.
+
+**Incremental cache.** Each `(d, seed)` cell reseeds its own generator, so its
+result depends only on `(d, seed)` and the `N` ladder. `_load_or_run` exploits
+this: it computes only the dimensions the cache is missing and merges them in,
+so extending the sweep by one `d` costs one `d` (about 50 min) rather than a
+full recompute (about 6 h at 30 seeds x 7 dimensions x 8 rungs). A cache built
+for a different ladder or seed set is discarded rather than trusted, since those
+would change every cell. `FORCE_RECOMPUTE = True` still rebuilds everything.
 
 ### Exp 6 - `realworld_mnist_30seed.ipynb`
 

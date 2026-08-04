@@ -261,6 +261,101 @@ def fit_gmu(X, y, sample_uncertainty, lam=LAM, max_iter=SVM_ITER, seed=SVM_SEED,
     return model.coef_.copy(), float(model.intercept_)
 
 
+def fit_standard_svm_on_cloud(X_cloud, y_cloud):
+    """Fit a standard SVM (no uncertainty) on a sampled cloud; return (w, b).
+
+    The single definition of the protocol used whenever an experiment spends its
+    sample budget on raw points rather than on a mixture description: no
+    uncertainty, iterations scaled to the cloud size, mini-batches of 256.
+    """
+    return fit_gmu(
+        X_cloud, y_cloud, None,
+        max_iter=svm_iter_for(len(X_cloud)), seed=SVM_SEED, batch_size=256,
+    )
+
+
+def add_standard_svm_boundaries(records):
+    """Attach a standard-SVM boundary (w_svm, b_svm) to each EM record, in place.
+
+    Every record already carries the sampled cloud its EM fits were trained on,
+    so the standard SVM fitted here consumes exactly the same points at exactly
+    the same budget: it is the uncertainty-blind counterpart of that record's
+    SVM-GMU fit. Deriving it from the records instead of computing it inside the
+    sweep keeps the (slow) EM cache valid. Shared by the EM notebook and the
+    paper's figure script so the two draw the identical boundary.
+    """
+    for r in records:
+        r["w_svm"], r["b_svm"] = fit_standard_svm_on_cloud(r["X_exp"], r["y_exp"])
+    return records
+
+
+def check_ascending_dimensions(res):
+    """Raise unless a sweep's rows are in strictly ascending dimension order.
+
+    Anything plotting against d joins consecutive rows into a curve, so rows that
+    are out of order do not fail: they quietly draw a line that doubles back on
+    itself, which is easy to miss and easy to publish. The cache stores rows in
+    the order the dimensions were computed, which need not be ascending, so this
+    guards the boundary where a wrong order turns into a wrong figure. Requiring
+    *strict* ascent also catches a duplicated dimension, which would mean a merge
+    went wrong. Returns res so it can wrap a value in place.
+    """
+    d = np.asarray(res["d_values"])
+    if d.size > 1 and not np.all(np.diff(d) > 0):
+        raise ValueError(
+            f"sweep rows must be in strictly ascending dimension order, got "
+            f"{[int(v) for v in d]}. Read the cache through load_highdim_cache, "
+            f"which orders them, and keep the requested dimension list sorted."
+        )
+    return res
+
+
+def load_highdim_cache(path):
+    """Load a high-dimensional sweep cache with its rows ordered by dimension.
+
+    The cache accumulates rows in the order dimensions were first computed, which
+    need not be ascending: extending an existing sweep appends the new dimension
+    after the ones already there. That order is an implementation detail of the
+    cache, not a display order, and plotting straight from it joins the points in
+    the wrong sequence and draws a curve that doubles back on itself. Every
+    reader should come through here rather than indexing the raw file.
+    """
+    data = np.load(path, allow_pickle=False)
+    res = {k: data[k] for k in data.files}
+    order = np.argsort(res["d_values"])
+    res["d_values"] = res["d_values"][order]
+    for key in ("angle", "offset", "rms"):
+        res[key] = res[key][order]
+    return check_ascending_dimensions(res)
+
+
+def nstar_from_angles(res, tau):
+    """N*(d) per seed: smallest ladder N reaching angle <= tau, else inf.
+
+    A seed that never reaches the tolerance within the ladder is *censored*, not
+    missing: its true N* is unknown but certainly larger than every rung, so inf
+    is the honest placeholder and it ranks above every seed that did reach the
+    tolerance. Recording nan instead and summarizing with nan-skipping functions
+    would silently drop exactly the worst seeds and bias the result downward,
+    reporting the median of the seeds that happened to succeed as though it were
+    the median over all of them. With inf in place an ordinary median runs over
+    every seed and evaluates to inf precisely when at least half never got there.
+
+    Callers should summarize with plain median/percentile (percentile needs
+    method="lower"/"higher": interpolating across inf computes inf - inf and
+    silently yields nan), then clip to the ladder ceiling for drawing.
+    """
+    angle, ladder = res["angle"], res["n_ladder"]
+    nd, ns, _ = angle.shape
+    nstar = np.full((nd, ns), np.inf)
+    for di in range(nd):
+        for si in range(ns):
+            below = np.where(angle[di, si, :] <= tau)[0]
+            if below.size:
+                nstar[di, si] = ladder[below[0]]
+    return nstar
+
+
 def fit_gmm_bic(points, m_candidates, n_init, seed) -> dict:
     """Fit a GMM to points, choosing the component count by minimum BIC."""
     best_bic = np.inf

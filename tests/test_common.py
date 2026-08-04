@@ -127,6 +127,70 @@ def test_mc_eval_cloud_shape():
     assert cloud.shape == (600, 2)
 
 
+def _fake_sweep(d_values):
+    """A minimal high-dimensional sweep result: one row per dimension."""
+    nd, ns, nl = len(d_values), 3, 4
+    filler = np.arange(nd * ns * nl, dtype=float).reshape(nd, ns, nl)
+    return {
+        "d_values": np.array(d_values),
+        "n_ladder": np.array([10.0, 100.0, 1000.0, 10000.0]),
+        "seeds": np.array([1, 2, 3]),
+        "angle": filler,
+        "offset": filler.copy(),
+        "rms": filler.copy(),
+    }
+
+
+def test_check_ascending_dimensions_accepts_sorted():
+    res = _fake_sweep([2, 3, 5, 10, 20, 35, 50])
+    assert C.check_ascending_dimensions(res) is res
+
+
+def test_check_ascending_dimensions_rejects_unsorted_and_duplicates():
+    # Appending a new dimension to the end is the tempting way to add one, and
+    # it is exactly what would silently draw a curve doubling back on itself.
+    for bad in ([2, 3, 5, 10, 20, 50, 35], [2, 5, 3], [2, 5, 5, 10]):
+        try:
+            C.check_ascending_dimensions(_fake_sweep(bad))
+        except ValueError as exc:
+            assert "ascending" in str(exc)
+        else:
+            raise AssertionError(f"expected ValueError for d_values={bad}")
+
+
+def test_load_highdim_cache_orders_rows_by_dimension(tmp_path):
+    # Rows stored the way the cache accumulates them: the new dimension appended.
+    stored = _fake_sweep([2, 3, 5, 10, 20, 50, 35])
+    path = tmp_path / "sweep.npz"
+    np.savez(path, **stored)
+
+    loaded = C.load_highdim_cache(path)
+
+    assert [int(v) for v in loaded["d_values"]] == [2, 3, 5, 10, 20, 35, 50]
+    # Every row must travel with its own dimension, not merely be re-sorted.
+    for i, d in enumerate(stored["d_values"]):
+        j = list(loaded["d_values"]).index(d)
+        for key in ("angle", "offset", "rms"):
+            assert np.array_equal(loaded[key][j], stored[key][i])
+
+
+def test_nstar_from_angles_marks_unreached_seeds_as_inf():
+    res = _fake_sweep([2])
+    # Seed 0 reaches tau at the second rung; seed 1 at the last; seed 2 never.
+    res["angle"] = np.array([[[9.0, 1.0, 0.5, 0.4],
+                              [9.0, 8.0, 7.0, 1.5],
+                              [9.0, 8.0, 7.0, 6.0]]])
+    nstar = C.nstar_from_angles(res, tau=2.0)
+    assert nstar.shape == (1, 3)
+    assert nstar[0, 0] == 100.0
+    assert nstar[0, 1] == 10000.0
+    # Censored, not missing: inf keeps the seed in the sample and ranks it above
+    # every seed that reached tau, so a plain median stays honest.
+    assert np.isinf(nstar[0, 2])
+    assert not np.isnan(nstar).any()
+    assert np.median(nstar[0]) == 10000.0
+
+
 def test_configure_pgf_sets_latex_serif():
     import matplotlib
 

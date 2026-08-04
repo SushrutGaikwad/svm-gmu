@@ -331,3 +331,5 @@ TSWLatexianTemp*
 #*Notes.bib
 
 paper/
+temp/
+exp6_mnist/

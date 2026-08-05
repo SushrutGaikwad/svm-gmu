@@ -1539,7 +1539,7 @@ The grid RMS of \cref{sec:exp_convergence} evaluates the decision functions on a
 \end{equation}
 with $\hat{f}$ the unit-normalized decision function of \cref{sec:exp_convergence}. The angle $\theta$ and the offset $\Delta^{\text{offset}}$ are dimension-agnostic already and carry over unchanged.
 
-The closed-form reference $(\vb{w}_{\text{ref}}^d, b_{\text{ref}}^d)$ is obtained by minimizing the SVM-GMU objective \cref{eq:gmu_objective} on the analytic mixtures; it is exact at every $d$ and never samples. For each dimension $d \in \{2, 3, 5, 10, 20, 50\}$ and each of $R = 30$ seeds (each seed drawing a fresh dataset and fresh samples), we sweep $N$ over a geometric ladder (a sequence whose values grow by a roughly constant multiplicative factor, here about $\times 3$ per step, so a handful of ``rungs'' span several orders of magnitude) $\{10, 30, 100, 300, 1000, 3000, 10^4, 3\times10^4\}$, fit a standard SVM to the $10N$-point cloud at each rung, and record $\theta$ against the reference. We define
+The closed-form reference $(\vb{w}_{\text{ref}}^d, b_{\text{ref}}^d)$ is obtained by minimizing the SVM-GMU objective \cref{eq:gmu_objective} on the analytic mixtures; it is exact at every $d$ and never samples. For each dimension $d \in \{2, 3, 5, 10, 20, 35, 50\}$ and each of $R = 30$ seeds (each seed drawing a fresh dataset and fresh samples), we sweep $N$ over a geometric ladder (a sequence whose values grow by a roughly constant multiplicative factor, here about $\times 3$ per step, so a handful of ``rungs'' span several orders of magnitude) $\{10, 30, 100, 300, 1000, 3000, 10^4, 3\times10^4\}$, fit a standard SVM to the $10N$-point cloud at each rung, and record $\theta$ against the reference. We define
 \begin{equation}\label{eq:exp_nstar}
     N^\ast(d) = \min\left\{ N \text{ on the ladder} : \theta \le \tau \right\},
 \end{equation}
@@ -1549,11 +1549,11 @@ the smallest number of samples per example at which the standard SVM matches the
 
 \subsection{Results}
 
-\Cref{tab:exp_high_dim} reports $N^\ast(d)$ for both tolerances, and \cref{fig:exp_high_dim_nstar} plots them on a logarithmic vertical axis. The growth is steep and orderly. At $\tau = 2^\circ$ the median samples-to-match climbs from $30$ at $d = 2$ to $10^4$ at $d = 20$, roughly an order of magnitude for every doubling of the dimension, and at $d = 50$ \emph{every one} of the $30$ seeds exceeds the ladder ceiling of $3\times10^4$. At the stricter $\tau = 1^\circ$ the wall arrives sooner: no seed reaches the tolerance within $3\times10^4$ samples by $d = 20$. The closed-form SVM-GMU, by contrast, attains the exact boundary at every $d$ from the ten examples and their mixture descriptions, with no sampling at all.
+\Cref{tab:exp_high_dim} reports $N^\ast(d)$ for both tolerances, and \cref{fig:exp_high_dim_nstar} plots them on a logarithmic vertical axis. The growth is steep and orderly. At $\tau = 2^\circ$ the median samples-to-match climbs from $30$ at $d = 2$ to $10^4$ at $d = 20$, roughly an order of magnitude for every doubling of the dimension. By $d = 35$ the median has reached the final rung of the ladder, $3\times10^4$, and $12$ of the $30$ seeds fail to reach the tolerance even there; by $d = 50$ \emph{every one} of the $30$ seeds exceeds the ceiling. At the stricter $\tau = 1^\circ$ the wall arrives sooner: half the seeds are already over the ceiling at $d = 10$, and no seed reaches the tolerance within $3\times10^4$ samples by $d = 20$. The closed-form SVM-GMU, by contrast, attains the exact boundary at every $d$ from the ten examples and their mixture descriptions, with no sampling at all.
 
 \begin{table}[H]
     \centering
-    \caption{Samples-to-match $N^\ast(d)$: the smallest number of Monte Carlo samples per example at which a standard SVM matches the closed-form SVM-GMU boundary to within $\tau$ degrees, on the genuinely $d$-dimensional Gaussian-mixture datasets of \cref{eq:exp_highd_construct}. Values are medians over $R = 30$ seeds; ``$>3\times10^4$'' marks dimensions where more than half the seeds never reach the tolerance within the ladder ceiling $N_{\max} = 3\times10^4$. The inter-quartile bands are shown in \cref{fig:exp_high_dim_nstar}.}
+    \caption{Samples-to-match $N^\ast(d)$: the smallest number of Monte Carlo samples per example at which a standard SVM matches the closed-form SVM-GMU boundary to within $\tau$ degrees, on the genuinely $d$-dimensional Gaussian-mixture datasets of \cref{eq:exp_highd_construct}. Values are medians over $R = 30$ seeds. A seed that never reaches the tolerance within the ladder ceiling $N_{\max} = 3\times10^4$ has no finite $N^\ast$ and cannot enter the median, so entries at dimensions where some seeds fail are optimistic; this affects $d = 10$ at $\tau = 1^\circ$ ($15$ of $30$ seeds over the ceiling) and $d = 35$ at $\tau = 2^\circ$ ($12$ of $30$). ``$>3\times10^4$'' marks dimensions where more than half the seeds never reach the tolerance. The inter-quartile bands are shown in \cref{fig:exp_high_dim_nstar}.}
     \label{tab:exp_high_dim}
     \begin{tabular}{@{}rrr@{}}
         \toprule
@@ -1564,6 +1564,7 @@ the smallest number of samples per example at which the standard SVM matches the
         5  & $1000$         & $3000$         \\
         10 & $3000$         & $10000$        \\
         20 & $10000$        & $>3\times10^4$ \\
+        35 & $30000$        & $>3\times10^4$ \\
         50 & $>3\times10^4$ & $>3\times10^4$ \\
         \bottomrule
     \end{tabular}

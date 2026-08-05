@@ -100,7 +100,7 @@ many seeds); the first run is about 28 minutes, then instant from cache.
 ### Exp 5 - `high_dim_scaling.ipynb`
 
 Builds a genuinely d-dimensional Gaussian-mixture dataset for each
-`d` in {2, 3, 5, 10, 20, 50} and measures `N*(d)`, the samples-per-example a
+`d` in {2, 3, 5, 10, 20, 35, 50} and measures `N*(d)`, the samples-per-example a
 standard SVM needs to match the closed-form SVM-GMU boundary to a fixed angular
 tolerance, plus a fixed-budget angle-versus-`d` view. The construction is built
 and plotted at `d = 2` first, where it can be seen, before being generalized.
@@ -114,7 +114,7 @@ runs load the cache and are instant. Each cached notebook has a
 overwrite the cache. All seeds are spawned from a master seed of 2026, so the
 regenerated numbers reproduce the report's tables exactly.
 
-Experiment 5's cache may hold more dimensions than the experiment reports, since
-it has accumulated exploratory runs. The notebook selects the reported
-dimensions when loading it, so the figures always match the report's table rather
-than whatever happens to be in the file.
+Experiment 5 picks its dimensions out of the cache by name rather than plotting
+whatever the file happens to contain, and errors out if any are missing. That
+keeps the figures determined by the notebook, so a cache left over from a run
+with a different ladder of dimensions cannot quietly change what gets plotted.
